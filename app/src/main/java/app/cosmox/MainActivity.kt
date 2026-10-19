@@ -143,8 +143,19 @@ class MainActivity : Activity() {
                     connection.readTimeout = 15000
                     connection.setRequestProperty("User-Agent", "CosmoX/1.0")
                     try {
-                        val bytes = connection.inputStream.use { it.readNBytes(4 * 1024 * 1024 + 1) }
-                        require(bytes.size <= 4 * 1024 * 1024) { "Подписка слишком большая (лимит 4 МБ)" }
+                        val bytes = connection.inputStream.use { input ->
+                            val output = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(8192)
+                            var total = 0
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                total += count
+                                require(total <= 4 * 1024 * 1024) { "Подписка слишком большая (лимит 4 МБ)" }
+                                output.write(buffer, 0, count)
+                            }
+                            output.toByteArray()
+                        }
                         String(bytes, StandardCharsets.UTF_8)
                     } finally { connection.disconnect() }
                 } else text
