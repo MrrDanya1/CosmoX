@@ -89,6 +89,10 @@ class MainActivity : Activity() {
             setOnClickListener { importClipboard() }
         }, params(0, 0, 0, 8))
         content.addView(Button(this).apply {
+            text = "Проверить сервер (без VPN)"
+            setOnClickListener { testServer() }
+        }, params(0, 0, 0, 8))
+        content.addView(Button(this).apply {
             text = "Подключиться"
             setTextColor(bg)
             setBackgroundColor(green)
@@ -225,6 +229,55 @@ class MainActivity : Activity() {
                 incoming.startsWith("hysteria://", true) || incoming.startsWith("hysteria2://", true) ||
                 incoming.startsWith("hy2://", true)) importText(incoming)
         }
+    }
+
+    /**
+     * Проверяет первый импортированный outbound отдельно от Android TUN.
+     * Так можно понять, недоступен ли сам VLESS-сервер или проблема в маршрутизации VPN.
+     */
+    private fun testServer() {
+        val saved = prefs.getString(CosmoVpnService.KEY_CONFIG, null)
+        if (saved.isNullOrBlank()) {
+            status.text = "Сначала импортируй сервер"
+            return
+        }
+        status.text = "Проверяем сервер напрямую..."
+        Thread {
+            try {
+                val fullConfig = JSONObject(saved)
+                val outbounds = fullConfig.optJSONArray("outbounds")
+                    ?: error("В конфигурации нет outbounds")
+                require(outbounds.length() > 0) { "Нет импортированных серверов" }
+                val first = outbounds.optJSONObject(0) ?: error("Первый сервер повреждён")
+                val tag = first.optString("tag").takeIf { it.isNotBlank() }
+                val outboundOnly = JSONObject().put("outbounds", outbounds)
+                val item = JSONObject().put("xrayJson", outboundOnly.toString())
+                if (tag != null) item.put("outboundTag", tag)
+                val payload = JSONObject()
+                    .put("configs", JSONArray().put(item))
+                    .put("timeout", 8)
+                    .put("url", "https://cp.cloudflare.com/")
+                val response = XrayBridge.invoke("pingBatch", payload)
+                val data = response.optJSONObject("data") ?: error("Проверка не вернула результат")
+                val results = data.optJSONArray("results") ?: error("В ответе нет результатов")
+                val result = results.optJSONObject(0) ?: error("Пустой результат проверки")
+                val success = result.optBoolean("success", false)
+                val delay = result.optInt("delay", -1)
+                val detail = result.optString("error").takeIf { it.isNotBlank() }
+                runOnUiThread {
+                    status.text = if (success) {
+                        "Сервер доступен: ${delay} мс. Если сайты не открываются, проблема вероятнее в TUN/маршрутизации."
+                    } else {
+                        "Сервер не прошёл проверку (${if (delay >= 0) "${delay} мс" else "нет ответа"})." +
+                            (detail?.let { " Причина: $it" } ?: "")
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    status.text = "Ошибка проверки: ${e.message ?: "неизвестная ошибка"}"
+                }
+            }
+        }.start()
     }
 
     private fun startVpn() {
