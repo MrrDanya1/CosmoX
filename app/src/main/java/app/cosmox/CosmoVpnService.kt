@@ -34,6 +34,8 @@ class CosmoVpnService : VpnService() {
                     ?: error("Сначала импортируй сервер")
                 XrayBridge.registerProtector(this)
                 tun = Builder()
+                    // Keep CosmoX control-plane traffic outside its own VPN to prevent a routing loop.
+                    .addDisallowedApplication(packageName)
                     .setSession("CosmoX")
                     .setMtu(1500)
                     .addAddress("10.111.0.1", 30)
