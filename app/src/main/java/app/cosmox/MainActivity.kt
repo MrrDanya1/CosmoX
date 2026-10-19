@@ -57,45 +57,111 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
-        val bg = 0xFF081813.toInt()
-        val panel = 0xFF10271F.toInt()
-        val green = 0xFF55E6A5.toInt()
-        val white = 0xFFF1FFF8.toInt()
-        val muted = 0xFF9AB7A9.toInt()
+        val bg = 0xFF050706.toInt()
+        val panel = 0xFF101512.toInt()
+        val panel2 = 0xFF171E19.toInt()
+        val neon = 0xFFB7FF3C.toInt()
+        val white = 0xFFF4F7F2.toInt()
+        val muted = 0xFF89958C.toInt()
+
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(24), dp(20), dp(20))
+            setPadding(dp(20), dp(18), dp(20), dp(18))
             setBackgroundColor(bg)
         }
-        val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(TextView(this).apply {
-            text = "CosmoX"; textSize = 34f; setTextColor(green)
+        val scroll = ScrollView(this).apply { clipToPadding = false }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(12))
+        }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        brand.addView(TextView(this).apply {
+            text = "CosmoX"
+            textSize = 30f
+            setTextColor(white)
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+            letterSpacing = -0.03f
+        })
+        brand.addView(label("PRIVATE NETWORK", muted, 10f, 0).apply { letterSpacing = 0.18f })
+        header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(TextView(this).apply {
+            text = "●  XRAY"
+            textSize = 11f
+            setTextColor(neon)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = rounded(panel2, 100)
+        })
+        content.addView(header, params(0, 0, 0, 26))
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(dp(20), dp(24), dp(20), dp(22))
+            background = rounded(panel, 28, 0xFF273128.toInt())
+        }
+        hero.addView(TextView(this).apply {
+            text = "YOUR CONNECTION"
+            textSize = 10f
+            letterSpacing = 0.18f
+            setTextColor(muted)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
-        content.addView(label("XRAY CORE • PRIVATE CONNECTION", muted, 12f, 20))
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(20), dp(18), dp(20))
-            setBackgroundColor(panel)
+        val orb = TextView(this).apply {
+            text = "✦"
+            textSize = 42f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(neon)
+            background = rounded(0xFF202D18.toInt(), 100, 0xFF354B24.toInt())
+            setPadding(dp(20), dp(10), dp(20), dp(10))
         }
-        card.addView(label("Защищённое соединение", white, 20f, 8))
-        status = label("Отключено", 0xFFFFD28A.toInt(), 14f, 0)
-        card.addView(status)
-        content.addView(card, params(0, 0, 0, 16))
+        hero.addView(orb, LinearLayout.LayoutParams(-2, -2).apply {
+            topMargin = dp(18)
+            bottomMargin = dp(16)
+        })
+        hero.addView(TextView(this).apply {
+            text = "Private by design"
+            textSize = 22f
+            setTextColor(white)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+        })
+        hero.addView(TextView(this).apply {
+            text = "Connect to your selected server"
+            textSize = 13f
+            setTextColor(muted)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(7), 0, dp(16))
+        })
+        status = TextView(this).apply {
+            text = "●  Отключено"
+            textSize = 13f
+            setTextColor(neon)
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(14), dp(9), dp(14), dp(9))
+            background = rounded(0xFF202D18.toInt(), 100)
+        }
+        hero.addView(status)
+        content.addView(hero, params(0, 0, 0, 16))
 
-        content.addView(Button(this).apply {
-            text = "Импортировать из буфера обмена"
-            setOnClickListener { importClipboard() }
-        }, params(0, 0, 0, 8))
-        content.addView(Button(this).apply {
-            text = "Проверить сервер (без VPN)"
-            setOnClickListener { testServer() }
-        }, params(0, 0, 0, 8))
-        content.addView(Button(this).apply {
+        val connect = Button(this).apply {
             text = "Подключиться"
+            textSize = 16f
+            isAllCaps = false
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             setTextColor(bg)
-            setBackgroundColor(green)
+            background = rounded(neon, 18)
+            stateListAnimator = null
+            minHeight = dp(58)
+            setPadding(dp(18), dp(12), dp(18), dp(12))
             setOnClickListener {
                 if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) {
                     status.text = "Сначала импортируй сервер"
@@ -104,19 +170,112 @@ class MainActivity : Activity() {
                 val prepare = VpnService.prepare(this@MainActivity)
                 if (prepare != null) startActivityForResult(prepare, permissionRequest) else startVpn()
             }
-        }, params(0, 0, 0, 8))
-        content.addView(Button(this).apply {
-            text = "Отключиться"
-            setOnClickListener { startService(Intent(this@MainActivity, CosmoVpnService::class.java).setAction(CosmoVpnService.ACTION_STOP)) }
-        }, params(0, 0, 0, 16))
-        servers = label("Серверы не добавлены", white, 14f, 0)
-        servers.setPadding(dp(16), dp(16), dp(16), dp(16))
-        servers.setBackgroundColor(panel)
-        content.addView(servers)
-        content.addView(label("CosmoX • Android • XTLS/libXray", muted, 12f, 20))
+        }
+        content.addView(connect, params(0, 0, 0, 10))
+
+        val disconnect = Button(this).apply {
+            text = "Отключить VPN"
+            textSize = 14f
+            isAllCaps = false
+            setTextColor(white)
+            background = rounded(panel2, 16, 0xFF29332B.toInt())
+            stateListAnimator = null
+            minHeight = dp(50)
+            setOnClickListener {
+                startService(Intent(this@MainActivity, CosmoVpnService::class.java).setAction(CosmoVpnService.ACTION_STOP))
+            }
+        }
+        content.addView(disconnect, params(0, 0, 0, 22))
+
+        content.addView(label("QUICK ACTIONS", muted, 10f, 10).apply {
+            letterSpacing = 0.16f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val import = actionTile("＋", "Импорт", "Добавить сервер") { importClipboard() }
+        val test = actionTile("⌁", "Проверка", "Пинг сервера") { testServer() }
+        actions.addView(import, LinearLayout.LayoutParams(0, -1, 1f).apply { marginEnd = dp(7) })
+        actions.addView(test, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = dp(7) })
+        content.addView(actions, params(0, 0, 0, 16))
+
+        val serverCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = rounded(panel, 20, 0xFF202821.toInt())
+        }
+        val serverHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        serverHeader.addView(TextView(this).apply {
+            text = "Мой сервер"
+            textSize = 16f
+            setTextColor(white)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        serverHeader.addView(TextView(this).apply {
+            text = "● LOCAL"
+            textSize = 10f
+            setTextColor(neon)
+            background = rounded(0xFF202D18.toInt(), 100)
+            setPadding(dp(9), dp(6), dp(9), dp(6))
+        })
+        serverCard.addView(serverHeader)
+        servers = label("Серверы не добавлены", muted, 13f, 0).apply {
+            setPadding(0, dp(12), 0, 0)
+        }
+        serverCard.addView(servers)
+        content.addView(serverCard, params(0, 0, 0, 18))
+
+        content.addView(TextView(this).apply {
+            text = "CosmoX  •  Powered by XTLS/libXray"
+            textSize = 11f
+            setTextColor(0xFF657068.toInt())
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(8))
+        })
+
         scroll.addView(content)
         root.addView(scroll, ViewGroup.LayoutParams(-1, -1))
         setContentView(root)
+    }
+
+    private fun rounded(color: Int, radius: Int, stroke: Int? = null): android.graphics.drawable.GradientDrawable {
+        return android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            if (stroke != null) setStroke(dp(1), stroke)
+        }
+    }
+
+    private fun actionTile(symbol: String, title: String, subtitle: String, action: () -> Unit): LinearLayout {
+        val tile = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(15), dp(10), dp(14))
+            background = rounded(0xFF101512.toInt(), 20, 0xFF202821.toInt())
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
+        }
+        tile.addView(TextView(this).apply {
+            text = symbol
+            textSize = 25f
+            setTextColor(0xFFB7FF3C.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        tile.addView(TextView(this).apply {
+            text = title
+            textSize = 15f
+            setTextColor(0xFFF4F7F2.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dp(8), 0, dp(3))
+        })
+        tile.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 11f
+            setTextColor(0xFF89958C.toInt())
+        })
+        return tile
     }
 
     private fun importClipboard() {
