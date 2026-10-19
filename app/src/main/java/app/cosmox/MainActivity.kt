@@ -196,8 +196,9 @@ class MainActivity : Activity() {
                 val data = response.optJSONObject("data") ?: error("Парсер не вернул серверы")
                 val outbounds = data.optJSONArray("outbounds") ?: error("В подписке нет поддерживаемых серверов")
                 require(outbounds.length() > 0) { "В ссылке не найдено серверов" }
-                val first = outbounds.optJSONObject(0)
-                if (first != null && first.optString("tag").isBlank()) first.put("tag", "proxy")
+                val first = outbounds.optJSONObject(0) ?: error("Первый сервер повреждён")
+                if (first.optString("tag").isBlank()) first.put("tag", "proxy")
+                val proxyTag = first.optString("tag")
                 val config = JSONObject()
                     .put("log", JSONObject().put("loglevel", "warning").put("access", "none"))
                     .put("inbounds", JSONArray().put(JSONObject()
@@ -205,7 +206,13 @@ class MainActivity : Activity() {
                         .put("settings", JSONObject().put("name", "CosmoX").put("mtu", 1500))))
                     .put("outbounds", outbounds)
                     .put("dns", JSONObject().put("servers", JSONArray().put("1.1.1.1").put("2606:4700:4700::1111")))
-                    .put("routing", JSONObject().put("domainStrategy", "IPIfNonMatch"))
+                    .put("routing", JSONObject()
+                        .put("domainStrategy", "IPIfNonMatch")
+                        // Route packets read from Android's TUN explicitly to the imported proxy.
+                        .put("rules", JSONArray().put(JSONObject()
+                            .put("type", "field")
+                            .put("inboundTag", JSONArray().put("tun-in"))
+                            .put("outboundTag", proxyTag))))
                 prefs.edit().putString(CosmoVpnService.KEY_CONFIG, config.toString())
                     .putString("profile_source", text).putInt("server_count", outbounds.length()).apply()
                 runOnUiThread {
@@ -236,6 +243,11 @@ class MainActivity : Activity() {
      * Так можно понять, недоступен ли сам VLESS-сервер или проблема в маршрутизации VPN.
      */
     private fun testServer() {
+        // libXray pingBatch rejects calls while its managed runXray instance is active.
+        if (prefs.getBoolean("connected", false)) {
+            status.text = "Отключи VPN перед проверкой сервера"
+            return
+        }
         val saved = prefs.getString(CosmoVpnService.KEY_CONFIG, null)
         if (saved.isNullOrBlank()) {
             status.text = "Сначала импортируй сервер"
