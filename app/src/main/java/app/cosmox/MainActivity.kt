@@ -362,7 +362,7 @@ class MainActivity : Activity() {
                 val selectable = selectableOutbounds(outbounds)
                 require(selectable.length() > 0) { "В подписке нет поддерживаемых прокси-серверов" }
                 runOnUiThread {
-                    showServerPicker(selectable, text, true)
+                    showServerPicker(outbounds, text, true)
                 }
             } catch (e: Exception) {
                 runOnUiThread { status.text = "Ошибка импорта: ${e.message ?: "неизвестная ошибка"}" }
@@ -395,19 +395,20 @@ class MainActivity : Activity() {
     }
 
     private fun showServerPicker(outbounds: JSONArray, source: String, isNewImport: Boolean) {
-        if (outbounds.length() == 0) {
+        val choices = selectableOutbounds(outbounds)
+        if (choices.length() == 0) {
             status.text = "Нет доступных серверов"
             return
         }
-        val labels = Array(outbounds.length()) { index ->
-            outboundLabel(outbounds.optJSONObject(index) ?: JSONObject(), index)
+        val labels = Array(choices.length()) { index ->
+            outboundLabel(choices.optJSONObject(index) ?: JSONObject(), index)
         }
         AlertDialog.Builder(this)
             .setTitle(if (isNewImport) "Выбери сервер подписки" else "Выбрать сервер")
             .setMessage("Подключение будет использовать выбранный сервер. Выбор можно изменить позже.")
             .setItems(labels) { _, which ->
                 try {
-                    val chosen = outbounds.getJSONObject(which)
+                    val chosen = choices.getJSONObject(which)
                     var tag = chosen.optString("tag")
                     if (tag.isBlank()) {
                         tag = "proxy-${which + 1}"
@@ -429,7 +430,7 @@ class MainActivity : Activity() {
                     prefs.edit()
                         .putString(CosmoVpnService.KEY_CONFIG, config.toString())
                         .putString("profile_source", source)
-                        .putInt("server_count", outbounds.length())
+                        .putInt("server_count", choices.length())
                         .putString("selected_server_tag", tag)
                         .putString("selected_server_name", chosen.optString("tag").ifBlank { "Сервер ${which + 1}" })
                         .apply()
@@ -451,7 +452,7 @@ class MainActivity : Activity() {
         }
         try {
             val root = JSONObject(saved)
-            val outbounds = selectableOutbounds(root.optJSONArray("outbounds") ?: JSONArray())
+            val outbounds = root.optJSONArray("outbounds") ?: JSONArray()
             showServerPicker(outbounds, prefs.getString("profile_source", "").orEmpty(), false)
         } catch (e: Exception) {
             status.text = "Не удалось открыть список серверов"
