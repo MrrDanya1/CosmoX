@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets
 class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var servers: TextView
+    private lateinit var connectButton: Button
     private val permissionRequest = 4101
     private val prefs by lazy { getSharedPreferences(CosmoVpnService.PREFS, MODE_PRIVATE) }
 
@@ -31,11 +32,13 @@ class MainActivity : Activity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             intent ?: return
             val error = intent.getStringExtra("error")
+            val connected = intent.getBooleanExtra("connected", false)
             status.text = when {
                 error != null -> "Ошибка: $error"
-                intent.getBooleanExtra("connected", false) -> "Подключено • Xray-core"
-                else -> "Отключено"
+                connected -> "●  Подключено • Xray-core"
+                else -> "●  Отключено"
             }
+            renderConnectionState(connected)
         }
     }
 
@@ -70,13 +73,8 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(18), dp(20), dp(18))
+            setPadding(dp(22), dp(18), dp(22), dp(12))
             setBackgroundColor(bg)
-        }
-        val scroll = ScrollView(this).apply { clipToPadding = false }
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(12))
         }
 
         val header = LinearLayout(this).apply {
@@ -86,7 +84,7 @@ class MainActivity : Activity() {
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brand.addView(TextView(this).apply {
             text = "CosmoX"
-            textSize = 30f
+            textSize = 31f
             setTextColor(white)
             typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
             letterSpacing = -0.03f
@@ -99,149 +97,158 @@ class MainActivity : Activity() {
             setTextColor(neon)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = rounded(panel2, 100)
+            background = rounded(panel2, 100, 0xFF283629.toInt())
         })
-        content.addView(header, params(0, 0, 0, 26))
+        root.addView(header, params(0, 0, 0, 10))
 
-        val hero = LinearLayout(this).apply {
+        val center = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
-            setPadding(dp(20), dp(24), dp(20), dp(22))
-            background = rounded(panel, 28, 0xFF273128.toInt())
+            gravity = android.view.Gravity.CENTER
         }
-        hero.addView(TextView(this).apply {
-            text = "YOUR CONNECTION"
+        root.addView(center, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        center.addView(TextView(this).apply {
+            text = "ЗАЩИТИ СВОЁ СОЕДИНЕНИЕ"
             textSize = 10f
-            letterSpacing = 0.18f
+            letterSpacing = 0.16f
+            gravity = android.view.Gravity.CENTER
             setTextColor(muted)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-        })
-        val orb = TextView(this).apply {
-            text = "✦"
-            textSize = 42f
+        }, params(0, 0, 0, 24))
+
+        connectButton = Button(this).apply {
+            text = "⏻\\nВКЛЮЧИТЬ"
+            textSize = 17f
+            isAllCaps = false
             gravity = android.view.Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             setTextColor(neon)
-            background = rounded(0xFF202D18.toInt(), 100, 0xFF354B24.toInt())
-            setPadding(dp(20), dp(10), dp(20), dp(10))
+            background = rounded(panel, 1000, neon)
+            stateListAnimator = null
+            minHeight = dp(190)
+            minimumHeight = dp(190)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setOnClickListener {
+                if (prefs.getBoolean("connected", false)) {
+                    startService(Intent(this@MainActivity, CosmoVpnService::class.java)
+                        .setAction(CosmoVpnService.ACTION_STOP))
+                    status.text = "Отключаем VPN..."
+                } else {
+                    if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) {
+                        status.text = "Сначала добавь сервер"
+                        return@setOnClickListener
+                    }
+                    val prepare = VpnService.prepare(this@MainActivity)
+                    if (prepare != null) startActivityForResult(prepare, permissionRequest) else startVpn()
+                }
+            }
         }
-        hero.addView(orb, LinearLayout.LayoutParams(-2, -2).apply {
-            topMargin = dp(18)
-            bottomMargin = dp(16)
-        })
-        hero.addView(TextView(this).apply {
-            text = "Private by design"
-            textSize = 22f
-            setTextColor(white)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        center.addView(connectButton, LinearLayout.LayoutParams(dp(190), dp(190)).apply {
             gravity = android.view.Gravity.CENTER
+            bottomMargin = dp(25)
         })
-        hero.addView(TextView(this).apply {
-            text = "Connect to your selected server"
-            textSize = 13f
-            setTextColor(muted)
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, dp(7), 0, dp(16))
-        })
+
         status = TextView(this).apply {
             text = "●  Отключено"
-            textSize = 13f
-            setTextColor(neon)
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(14), dp(9), dp(14), dp(9))
-            background = rounded(0xFF202D18.toInt(), 100)
-        }
-        hero.addView(status)
-        content.addView(hero, params(0, 0, 0, 16))
-
-        val connect = Button(this).apply {
-            text = "Подключиться"
-            textSize = 16f
-            isAllCaps = false
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(bg)
-            background = rounded(neon, 18)
-            stateListAnimator = null
-            minHeight = dp(58)
-            setPadding(dp(18), dp(12), dp(18), dp(12))
-            setOnClickListener {
-                if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) {
-                    status.text = "Сначала импортируй сервер"
-                    return@setOnClickListener
-                }
-                val prepare = VpnService.prepare(this@MainActivity)
-                if (prepare != null) startActivityForResult(prepare, permissionRequest) else startVpn()
-            }
-        }
-        content.addView(connect, params(0, 0, 0, 10))
-
-        val disconnect = Button(this).apply {
-            text = "Отключить VPN"
             textSize = 14f
-            isAllCaps = false
-            setTextColor(white)
-            background = rounded(panel2, 16, 0xFF29332B.toInt())
-            stateListAnimator = null
-            minHeight = dp(50)
-            setOnClickListener {
-                startService(Intent(this@MainActivity, CosmoVpnService::class.java).setAction(CosmoVpnService.ACTION_STOP))
-            }
-        }
-        content.addView(disconnect, params(0, 0, 0, 22))
-
-        content.addView(label("QUICK ACTIONS", muted, 10f, 10).apply {
-            letterSpacing = 0.16f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        })
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val import = actionTile("＋", "Импорт", "Добавить сервер") { importClipboard() }
-        val test = actionTile("⌁", "Проверка", "Пинг сервера") { testServer() }
-        actions.addView(import, LinearLayout.LayoutParams(0, -1, 1f).apply { marginEnd = dp(7) })
-        actions.addView(test, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = dp(7) })
-        content.addView(actions, params(0, 0, 0, 16))
-
-        val serverCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = rounded(panel, 20, 0xFF202821.toInt())
-        }
-        val serverHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-        }
-        serverHeader.addView(TextView(this).apply {
-            text = "Мой сервер"
-            textSize = 16f
-            setTextColor(white)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }, LinearLayout.LayoutParams(0, -2, 1f))
-        serverHeader.addView(TextView(this).apply {
-            text = "● LOCAL"
-            textSize = 10f
-            setTextColor(neon)
-            background = rounded(0xFF202D18.toInt(), 100)
-            setPadding(dp(9), dp(6), dp(9), dp(6))
-        })
-        serverCard.addView(serverHeader)
-        servers = label("Серверы не добавлены", muted, 13f, 0).apply {
-            setPadding(0, dp(12), 0, 0)
-        }
-        serverCard.addView(servers)
-        serverCard.isClickable = true
-        serverCard.isFocusable = true
-        serverCard.setOnClickListener { openSavedServerPicker() }
-        content.addView(serverCard, params(0, 0, 0, 18))
-
-        content.addView(TextView(this).apply {
-            text = "CosmoX  •  Powered by XTLS/libXray"
-            textSize = 11f
-            setTextColor(0xFF657068.toInt())
             gravity = android.view.Gravity.CENTER
-            setPadding(0, dp(6), 0, dp(8))
+            setTextColor(muted)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = rounded(panel2, 100)
+        }
+        center.addView(status, params(0, 0, 0, 24))
+
+        val selectedServerCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(18), dp(13), dp(18), dp(13))
+            background = rounded(panel, 18, 0xFF29332B.toInt())
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { openSavedServerPicker() }
+        }
+        selectedServerCard.addView(TextView(this).apply {
+            text = "ВЫБРАННЫЙ СЕРВЕР"
+            textSize = 9f
+            letterSpacing = 0.14f
+            setTextColor(muted)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        servers = TextView(this).apply {
+            text = "Сервер не выбран"
+            textSize = 16f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(white)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dp(5), 0, 0)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        selectedServerCard.addView(servers)
+        center.addView(selectedServerCard, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(2)
         })
 
-        scroll.addView(content)
-        root.addView(scroll, ViewGroup.LayoutParams(-1, -1))
+        val bottomNav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(6), dp(7), dp(6), dp(7))
+            background = rounded(panel, 22, 0xFF202821.toInt())
+        }
+
+        val importButton = navButton("＋", "Добавить", neon, panel) { importClipboard() }
+        val serverButton = navButton("▦", "Серверы", white, panel2) { openSavedServerPicker() }
+        val settingsButton = navButton("⚙", "Настройки", muted, panel) {
+            status.text = "Настройки появятся позже"
+        }
+        bottomNav.addView(importButton, LinearLayout.LayoutParams(0, dp(58), 1f))
+        bottomNav.addView(serverButton, LinearLayout.LayoutParams(0, dp(58), 1f).apply {
+            leftMargin = dp(5)
+            rightMargin = dp(5)
+        })
+        bottomNav.addView(settingsButton, LinearLayout.LayoutParams(0, dp(58), 1f))
+        root.addView(bottomNav, params(0, 12, 0, 0))
+
         setContentView(root)
+        renderConnectionState(prefs.getBoolean("connected", false))
+    }
+
+    private fun navButton(symbol: String, title: String, color: Int, panel: Int, action: () -> Unit): LinearLayout {
+        val item = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(4), dp(5), dp(4), dp(5))
+            background = rounded(panel, 16)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
+        }
+        item.addView(TextView(this).apply {
+            text = symbol
+            textSize = 20f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(color)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        item.addView(TextView(this).apply {
+            text = title
+            textSize = 10f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(color)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dp(2), 0, 0)
+        })
+        return item
+    }
+
+    private fun renderConnectionState(connected: Boolean) {
+        if (!::connectButton.isInitialized) return
+        val bg = 0xFF050706.toInt()
+        val panel = 0xFF101512.toInt()
+        val neon = 0xFFB7FF3C.toInt()
+        connectButton.text = if (connected) "⏻\\nОТКЛЮЧИТЬ" else "⏻\\nВКЛЮЧИТЬ"
+        connectButton.setTextColor(if (connected) bg else neon)
+        connectButton.background = if (connected) rounded(neon, 1000) else rounded(panel, 1000, neon)
     }
 
     private fun rounded(color: Int, radius: Int, stroke: Int? = null): android.graphics.drawable.GradientDrawable {
@@ -401,7 +408,8 @@ class MainActivity : Activity() {
             return
         }
         val labels = Array(choices.length()) { index ->
-            outboundLabel(choices.optJSONObject(index) ?: JSONObject(), index)
+            val item = choices.optJSONObject(index) ?: JSONObject()
+            item.optString("tag").ifBlank { "Сервер ${index + 1}" }
         }
         AlertDialog.Builder(this)
             .setTitle(if (isNewImport) "Выбери сервер подписки" else "Выбрать сервер")
@@ -541,10 +549,10 @@ class MainActivity : Activity() {
     private fun updateSavedState() {
         val count = prefs.getInt("server_count", 0)
         val selected = prefs.getString("selected_server_name", null)
-        servers.text = if (count > 0) {
-            "${selected ?: "Сервер не выбран"}\nСерверов в подписке: $count\nНажми, чтобы сменить сервер"
-        } else "Серверы не добавлены"
-        if (prefs.getBoolean("connected", false)) status.text = "Подключено • Xray-core"
+        servers.text = if (count > 0) selected ?: "Сервер не выбран" else "Сервер не выбран"
+        val connected = prefs.getBoolean("connected", false)
+        status.text = if (connected) "●  Подключено • Xray-core" else "●  Отключено"
+        renderConnectionState(connected)
     }
 
     override fun onDestroy() {
