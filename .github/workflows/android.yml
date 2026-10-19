@@ -39,12 +39,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android NDK
         run: |
-          sdkmanager "ndk;27.2.12479018"
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
       - name: Build native Xray Android AAR
