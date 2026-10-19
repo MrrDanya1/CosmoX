@@ -41,9 +41,8 @@ class CosmoVpnService : VpnService() {
                     .addAddress("10.111.0.1", 30)
                     .addRoute("0.0.0.0", 0)
                     .addDnsServer("1.1.1.1")
-                    .addAddress("fdfe:dcba:9876::1", 126)
-                    .addRoute("::", 0)
-                    .addDnsServer("2606:4700:4700::1111")
+                    // IPv4-only diagnostic mode: avoid blackholing traffic on devices/networks
+                    // where the IPv6 route or resolver is not carried correctly through the tunnel.
                     .establish() ?: error("Android не разрешил создать VPN-интерфейс")
                 XrayBridge.setDns(this, "1.1.1.1:53")
                 val root = JSONObject(config)
