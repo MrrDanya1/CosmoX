@@ -3,6 +3,7 @@ package app.cosmox
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.VpnService
@@ -98,6 +99,10 @@ class MainActivity : Activity() {
         }
         content.addView(source, params(0, 0, 0, 10))
         content.addView(Button(this).apply {
+            text = "Импортировать из буфера обмена"
+            setOnClickListener { importClipboard() }
+        }, params(0, 0, 0, 8))
+        content.addView(Button(this).apply {
             text = "Импортировать сервер / подписку"
             setOnClickListener { importSource() }
         }, params(0, 0, 0, 8))
@@ -128,13 +133,59 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    private fun importSource() {
-        val text = source.text.toString().trim()
-        if (text.isEmpty()) {
-            status.text = "Вставь ссылку или URL подписки"
+    private fun importClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = clipboard.primaryClip
+        if (clip == null || clip.itemCount == 0) {
+            status.text = "Буфер обмена пуст"
             return
         }
-        status.text = "Импорт..."
+        val copiedText = runCatching { clip.getItemAt(0).coerceToText(this)?.toString().orEmpty() }.getOrDefault("").trim()
+        if (copiedText.isBlank()) {
+            status.text = "В буфере нет текста со ссылкой или конфигурацией"
+            return
+        }
+        source.setText(copiedText)
+        val kind = detectImportType(copiedText)
+        status.text = "Обнаружено: $kind • импорт..."
+        importText(copiedText)
+    }
+
+    private fun detectImportType(text: String): String {
+        val value = text.trim()
+        val lower = value.lowercase()
+        return when {
+            value.startsWith("{") || value.startsWith("[") -> {
+                val json = runCatching { JSONObject(value) }.getOrNull()
+                if (json?.has("outbounds") == true) "Xray JSON" else "JSON-конфигурация"
+            }
+            lower.contains("hysteria2://") || lower.contains("hysteria://") || lower.contains("hy2://") ->
+                "Hysteria (не поддерживается Xray-core)"
+            lower.contains("vless://") -> "VLESS"
+            lower.contains("vmess://") -> "VMess"
+            lower.contains("trojan://") -> "Trojan"
+            lower.contains("ss://") -> "Shadowsocks"
+            lower.contains("socks://") -> "SOCKS"
+            lower.contains("http://") || lower.contains("https://") -> "URL подписки / ссылка"
+            else -> "ссылка или список серверов"
+        }
+    }
+
+    private fun importSource() {
+        importText(source.text.toString().trim())
+    }
+
+    private fun importText(text: String) {
+        if (text.isEmpty()) {
+            status.text = "Скопируй ссылку, подписку или JSON-конфигурацию"
+            return
+        }
+        val detectedType = detectImportType(text)
+        if (detectedType.startsWith("Hysteria")) {
+            status.text = "Найден Hysteria. Xray-core не запускает протокол Hysteria; нужен отдельный движок sing-box."
+            return
+        }
+        status.text = "Импорт: $detectedType..."
         Thread {
             try {
                 val input = if (text.startsWith("https://", true) || text.startsWith("http://", true)) {
@@ -159,7 +210,8 @@ class MainActivity : Activity() {
                         String(bytes, StandardCharsets.UTF_8)
                     } finally { connection.disconnect() }
                 } else text
-                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", input))
+                val normalizedInput = input.trim()
+                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", normalizedInput))
                 val data = response.optJSONObject("data") ?: error("Парсер не вернул серверы")
                 val outbounds = data.optJSONArray("outbounds") ?: error("В подписке нет поддерживаемых серверов")
                 require(outbounds.length() > 0) { "В ссылке не найдено серверов" }
