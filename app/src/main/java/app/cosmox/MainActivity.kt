@@ -1,6 +1,7 @@
 package app.cosmox
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.ClipboardManager
@@ -225,6 +226,9 @@ class MainActivity : Activity() {
             setPadding(0, dp(12), 0, 0)
         }
         serverCard.addView(servers)
+        serverCard.isClickable = true
+        serverCard.isFocusable = true
+        serverCard.setOnClickListener { openSavedServerPicker() }
         content.addView(serverCard, params(0, 0, 0, 18))
 
         content.addView(TextView(this).apply {
@@ -355,33 +359,103 @@ class MainActivity : Activity() {
                 val data = response.optJSONObject("data") ?: error("Парсер не вернул серверы")
                 val outbounds = data.optJSONArray("outbounds") ?: error("В подписке нет поддерживаемых серверов")
                 require(outbounds.length() > 0) { "В ссылке не найдено серверов" }
-                val first = outbounds.optJSONObject(0) ?: error("Первый сервер повреждён")
-                if (first.optString("tag").isBlank()) first.put("tag", "proxy")
-                val proxyTag = first.optString("tag")
-                val config = JSONObject()
-                    .put("log", JSONObject().put("loglevel", "warning").put("access", "none"))
-                    .put("inbounds", JSONArray().put(JSONObject()
-                        .put("tag", "tun-in").put("port", 0).put("protocol", "tun")
-                        .put("settings", JSONObject().put("name", "CosmoX").put("mtu", 1500))))
-                    .put("outbounds", outbounds)
-                    .put("dns", JSONObject().put("servers", JSONArray().put("1.1.1.1").put("2606:4700:4700::1111")))
-                    .put("routing", JSONObject()
-                        .put("domainStrategy", "IPIfNonMatch")
-                        // Route packets read from Android's TUN explicitly to the imported proxy.
-                        .put("rules", JSONArray().put(JSONObject()
-                            .put("type", "field")
-                            .put("inboundTag", JSONArray().put("tun-in"))
-                            .put("outboundTag", proxyTag))))
-                prefs.edit().putString(CosmoVpnService.KEY_CONFIG, config.toString())
-                    .putString("profile_source", text).putInt("server_count", outbounds.length()).apply()
+                val selectable = selectableOutbounds(outbounds)
+                require(selectable.length() > 0) { "В подписке нет поддерживаемых прокси-серверов" }
                 runOnUiThread {
-                    status.text = "Импортировано серверов: ${outbounds.length()}"
-                    updateSavedState()
+                    showServerPicker(selectable, text, true)
                 }
             } catch (e: Exception) {
                 runOnUiThread { status.text = "Ошибка импорта: ${e.message ?: "неизвестная ошибка"}" }
             }
         }.start()
+    }
+
+    private fun selectableOutbounds(outbounds: JSONArray): JSONArray {
+        val result = JSONArray()
+        for (i in 0 until outbounds.length()) {
+            val item = outbounds.optJSONObject(i) ?: continue
+            val protocol = item.optString("protocol").lowercase()
+            if (protocol !in setOf("freedom", "direct", "blackhole", "block", "dns", "")) {
+                if (item.optString("tag").isBlank()) item.put("tag", "proxy-${result.length() + 1}")
+                result.put(item)
+            }
+        }
+        return result
+    }
+
+    private fun outboundLabel(outbound: JSONObject, index: Int): String {
+        val tag = outbound.optString("tag").takeIf { it.isNotBlank() } ?: "Сервер ${index + 1}"
+        val protocol = outbound.optString("protocol").uppercase().ifBlank { "PROXY" }
+        val servers = outbound.optJSONObject("settings")?.optJSONArray("servers")
+        val firstServer = servers?.optJSONObject(0)
+        val address = firstServer?.optString("address")?.takeIf { it.isNotBlank() }
+        val port = if (firstServer != null && firstServer.has("port")) firstServer.optInt("port") else -1
+        val endpoint = if (address != null) "\n$address${if (port > 0) ":$port" else ""}" else ""
+        return "$tag  •  $protocol$endpoint"
+    }
+
+    private fun showServerPicker(outbounds: JSONArray, source: String, isNewImport: Boolean) {
+        if (outbounds.length() == 0) {
+            status.text = "Нет доступных серверов"
+            return
+        }
+        val labels = Array(outbounds.length()) { index ->
+            outboundLabel(outbounds.optJSONObject(index) ?: JSONObject(), index)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(if (isNewImport) "Выбери сервер подписки" else "Выбрать сервер")
+            .setMessage("Подключение будет использовать выбранный сервер. Выбор можно изменить позже.")
+            .setItems(labels) { _, which ->
+                try {
+                    val chosen = outbounds.getJSONObject(which)
+                    var tag = chosen.optString("tag")
+                    if (tag.isBlank()) {
+                        tag = "proxy-${which + 1}"
+                        chosen.put("tag", tag)
+                    }
+                    val config = JSONObject()
+                        .put("log", JSONObject().put("loglevel", "warning").put("access", "none"))
+                        .put("inbounds", JSONArray().put(JSONObject()
+                            .put("tag", "tun-in").put("port", 0).put("protocol", "tun")
+                            .put("settings", JSONObject().put("name", "CosmoX").put("mtu", 1500))))
+                        .put("outbounds", outbounds)
+                        .put("dns", JSONObject().put("servers", JSONArray().put("1.1.1.1").put("2606:4700:4700::1111")))
+                        .put("routing", JSONObject()
+                            .put("domainStrategy", "IPIfNonMatch")
+                            .put("rules", JSONArray().put(JSONObject()
+                                .put("type", "field")
+                                .put("inboundTag", JSONArray().put("tun-in"))
+                                .put("outboundTag", tag))))
+                    prefs.edit()
+                        .putString(CosmoVpnService.KEY_CONFIG, config.toString())
+                        .putString("profile_source", source)
+                        .putInt("server_count", outbounds.length())
+                        .putString("selected_server_tag", tag)
+                        .putString("selected_server_name", chosen.optString("tag").ifBlank { "Сервер ${which + 1}" })
+                        .apply()
+                    status.text = "Выбран сервер: ${chosen.optString("tag").ifBlank { "Сервер ${which + 1}" }}"
+                    updateSavedState()
+                } catch (e: Exception) {
+                    status.text = "Не удалось выбрать сервер: ${e.message ?: "ошибка"}"
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun openSavedServerPicker() {
+        val saved = prefs.getString(CosmoVpnService.KEY_CONFIG, null)
+        if (saved.isNullOrBlank()) {
+            status.text = "Сначала импортируй подписку"
+            return
+        }
+        try {
+            val root = JSONObject(saved)
+            val outbounds = selectableOutbounds(root.optJSONArray("outbounds") ?: JSONArray())
+            showServerPicker(outbounds, prefs.getString("profile_source", "").orEmpty(), false)
+        } catch (e: Exception) {
+            status.text = "Не удалось открыть список серверов"
+        }
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
@@ -465,7 +539,10 @@ class MainActivity : Activity() {
 
     private fun updateSavedState() {
         val count = prefs.getInt("server_count", 0)
-        servers.text = if (count > 0) "Импортировано серверов: $count\nПервый сервер используется по умолчанию" else "Серверы не добавлены"
+        val selected = prefs.getString("selected_server_name", null)
+        servers.text = if (count > 0) {
+            "${selected ?: "Сервер не выбран"}\nСерверов в подписке: $count\nНажми, чтобы сменить сервер"
+        } else "Серверы не добавлены"
         if (prefs.getBoolean("connected", false)) status.text = "Подключено • Xray-core"
     }
 
