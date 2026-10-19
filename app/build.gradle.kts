@@ -11,15 +11,8 @@ android {
         applicationId = "app.cosmox"
         minSdk = 23
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0"
-
-        // Build a smaller APK for current Android phones, including Redmi Note 9 Pro.
-        // The native Xray core is large; shipping unused emulator/32-bit ABIs inflates
-        // the package and can trigger failures in some OEM file installers.
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildTypes {
