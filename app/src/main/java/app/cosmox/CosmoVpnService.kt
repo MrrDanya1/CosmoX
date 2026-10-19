@@ -47,9 +47,18 @@ class CosmoVpnService : VpnService() {
                 XrayBridge.setDns(this, "1.1.1.1:53")
                 val root = JSONObject(config)
                 // libXray expects env.xray as a JSON-encoded string, not a nested object.
-                val xrayEnv = JSONObject().put("tun", JSONObject().put("fd", tun!!.fd))
-                root.put("env", JSONObject().put("xray", xrayEnv.toString()))
+                // libXray reads runtime variables from the root env object using dotted keys.
+                // Passing env.xray as a JSON string does not set xray.tun.fd and can leave TUN
+                // attached to Android while Xray never receives the file descriptor.
+                val env = root.optJSONObject("env") ?: JSONObject()
+                env.put("xray.tun.fd", tun!!.fd.toString())
+                root.put("env", env)
                 XrayBridge.invoke("runXray", JSONObject().put("xrayJson", root.toString()))
+                val state = XrayBridge.invoke("getXrayState")
+                val data = state.optJSONObject("data")
+                if (data != null && !data.optBoolean("running", false)) {
+                    error("Xray-core не перешёл в состояние запуска")
+                }
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("connected", true).apply()
                 sendBroadcast(Intent("app.cosmox.STATUS").setPackage(packageName).putExtra("connected", true))
             } catch (e: Exception) {
