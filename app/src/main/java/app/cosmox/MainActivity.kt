@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.VpnService
 import android.os.Bundle
-import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -23,7 +22,6 @@ import java.nio.charset.StandardCharsets
 
 class MainActivity : Activity() {
     private lateinit var status: TextView
-    private lateinit var source: EditText
     private lateinit var servers: TextView
     private val permissionRequest = 4101
     private val prefs by lazy { getSharedPreferences(CosmoVpnService.PREFS, MODE_PRIVATE) }
@@ -86,25 +84,9 @@ class MainActivity : Activity() {
         card.addView(status)
         content.addView(card, params(0, 0, 0, 16))
 
-        source = EditText(this).apply {
-            hint = "VLESS / VMess / Trojan / Shadowsocks или URL подписки"
-            setHintTextColor(muted)
-            setTextColor(white)
-            setLinkTextColor(green)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            minLines = 3
-            maxLines = 7
-            gravity = Gravity.TOP
-            setBackgroundColor(panel)
-        }
-        content.addView(source, params(0, 0, 0, 10))
         content.addView(Button(this).apply {
             text = "Импортировать из буфера обмена"
             setOnClickListener { importClipboard() }
-        }, params(0, 0, 0, 8))
-        content.addView(Button(this).apply {
-            text = "Импортировать сервер / подписку"
-            setOnClickListener { importSource() }
         }, params(0, 0, 0, 8))
         content.addView(Button(this).apply {
             text = "Подключиться"
@@ -145,7 +127,6 @@ class MainActivity : Activity() {
             status.text = "В буфере нет текста со ссылкой или конфигурацией"
             return
         }
-        source.setText(copiedText)
         val kind = detectImportType(copiedText)
         status.text = "Обнаружено: $kind • импорт..."
         importText(copiedText)
@@ -169,10 +150,6 @@ class MainActivity : Activity() {
             lower.contains("http://") || lower.contains("https://") -> "URL подписки / ссылка"
             else -> "ссылка или список серверов"
         }
-    }
-
-    private fun importSource() {
-        importText(source.text.toString().trim())
     }
 
     private fun importText(text: String) {
@@ -242,10 +219,11 @@ class MainActivity : Activity() {
         val shared = intent?.getStringExtra(Intent.EXTRA_TEXT)
         val incoming = data?.toString() ?: shared
         if (!incoming.isNullOrBlank()) {
-            source.setText(incoming)
             if (incoming.startsWith("vless://", true) || incoming.startsWith("vmess://", true) ||
                 incoming.startsWith("trojan://", true) || incoming.startsWith("ss://", true) ||
-                incoming.startsWith("https://", true)) importSource()
+                incoming.startsWith("https://", true) || incoming.trimStart().startsWith("{") ||
+                incoming.startsWith("hysteria://", true) || incoming.startsWith("hysteria2://", true) ||
+                incoming.startsWith("hy2://", true)) importText(incoming)
         }
     }
 
