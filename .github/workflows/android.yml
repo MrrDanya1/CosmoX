@@ -39,9 +39,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install Android NDK
         run: |
-          yes | sdkmanager --licenses >/dev/null
           sdkmanager "ndk;27.2.12479018"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
@@ -52,6 +54,11 @@ jobs:
           test -s libXray.aar
           mkdir -p ../app/libs
           cp libXray.aar ../app/libs/libXray.aar
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Build CosmoX APK
         run: gradle assembleDebug
