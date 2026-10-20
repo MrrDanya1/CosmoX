@@ -60,194 +60,117 @@ class MainActivity : Activity() {
         handleIncomingIntent(intent)
     }
 
+    private lateinit var pageContent: LinearLayout
+    private var currentPage = "home"
+
     private fun buildUi() {
-        val bg = 0xFF050706.toInt()
-        val panel = 0xFF101512.toInt()
-        val panel2 = 0xFF171E19.toInt()
-        val neon = 0xFFB7FF3C.toInt()
-        val white = 0xFFF4F7F2.toInt()
-        val muted = 0xFF89958C.toInt()
-
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(18), dp(22), dp(12))
-            setBackgroundColor(bg)
-        }
-
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-        }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(16), dp(20), dp(12)); setBackgroundColor(0xFF050706.toInt()) }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        brand.addView(TextView(this).apply {
-            text = "CosmoX"
-            textSize = 31f
-            setTextColor(white)
-            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
-            letterSpacing = -0.03f
-        })
-        brand.addView(label("PRIVATE NETWORK", muted, 10f, 0).apply { letterSpacing = 0.18f })
+        brand.addView(TextView(this).apply { text = "CosmoX"; textSize = 31f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD })
+        brand.addView(label("PRIVATE NETWORK", 0xFF89958C.toInt(), 10f, 0))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(TextView(this).apply {
-            text = "●  XRAY"
-            textSize = 11f
-            setTextColor(neon)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = rounded(panel2, 100, 0xFF283629.toInt())
-        })
-        root.addView(header, params(0, 0, 0, 10))
+        header.addView(TextView(this).apply { text = "● XRAY"; textSize = 11f; setTextColor(0xFFB7FF3C.toInt()); setPadding(dp(12), dp(8), dp(12), dp(8)); background = rounded(0xFF171E19.toInt(), 100, 0xFF283629.toInt()) })
+        root.addView(header, params(0, 0, 0, 12))
+        pageContent = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER }
+        root.addView(pageContent, LinearLayout.LayoutParams(-1, 0, 1f))
+        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER; setPadding(dp(6), dp(7), dp(6), dp(7)); background = rounded(0xFF101512.toInt(), 22, 0xFF202821.toInt()) }
+        nav.addView(navButton("⌂", "Главная", 0xFFF4F7F2.toInt(), 0xFF171E19.toInt()) { showPage("home") }, LinearLayout.LayoutParams(0, dp(58), 1f))
+        nav.addView(navButton("▦", "Серверы", 0xFFB7FF3C.toInt(), 0xFF101512.toInt()) { showPage("servers") }, LinearLayout.LayoutParams(0, dp(58), 1f).apply { leftMargin = dp(5); rightMargin = dp(5) })
+        nav.addView(navButton("⚙", "Настройки", 0xFF89958C.toInt(), 0xFF101512.toInt()) { showPage("settings") }, LinearLayout.LayoutParams(0, dp(58), 1f))
+        root.addView(nav, params(0, 12, 0, 0))
+        setContentView(root)
+        showPage("home")
+    }
 
-        val center = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER
+    private fun showPage(page: String) {
+        currentPage = page
+        pageContent.removeAllViews()
+        when (page) {
+            "servers" -> renderServersPage()
+            "settings" -> {
+                pageContent.gravity = android.view.Gravity.TOP
+                pageContent.addView(TextView(this).apply { text = "НАСТРОЙКИ"; textSize = 24f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 8, 0, 12))
+                pageContent.addView(TextView(this).apply { text = "Раздел настроек добавим позже"; textSize = 14f; setTextColor(0xFF89958C.toInt()) })
+            }
+            else -> renderHomePage()
         }
-        root.addView(center, LinearLayout.LayoutParams(-1, 0, 1f))
+    }
 
-        center.addView(TextView(this).apply {
-            text = "ЗАЩИТИ СВОЁ СОЕДИНЕНИЕ"
-            textSize = 10f
-            letterSpacing = 0.16f
-            gravity = android.view.Gravity.CENTER
-            setTextColor(muted)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }, params(0, 0, 0, 24))
-
+    private fun renderHomePage() {
+        pageContent.gravity = android.view.Gravity.CENTER
+        pageContent.addView(TextView(this).apply { text = "ЗАЩИТИ СВОЁ СОЕДИНЕНИЕ"; textSize = 10f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 0, 0, 18))
         connectButton = Button(this).apply {
-            text = "⏻\\nВКЛЮЧИТЬ"
-            textSize = 17f
-            isAllCaps = false
-            gravity = android.view.Gravity.CENTER
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(neon)
-            background = rounded(panel, 1000, neon)
-            stateListAnimator = null
-            minHeight = dp(190)
-            minimumHeight = dp(190)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+            textSize = 17f; isAllCaps = false; gravity = android.view.Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD; stateListAnimator = null
             setOnClickListener {
                 if (prefs.getBoolean("connected", false)) {
-                    startService(Intent(this@MainActivity, CosmoVpnService::class.java)
-                        .setAction(CosmoVpnService.ACTION_STOP))
+                    startService(Intent(this@MainActivity, CosmoVpnService::class.java).setAction(CosmoVpnService.ACTION_STOP))
                     status.text = "Отключаем VPN..."
                 } else {
-                    if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) {
-                        status.text = "Сначала добавь сервер"
-                        return@setOnClickListener
-                    }
+                    if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) { status.text = "Сначала добавь сервер"; return@setOnClickListener }
                     val prepare = VpnService.prepare(this@MainActivity)
                     if (prepare != null) startActivityForResult(prepare, permissionRequest) else startVpn()
                 }
             }
         }
-        center.addView(connectButton, LinearLayout.LayoutParams(dp(190), dp(190)).apply {
-            gravity = android.view.Gravity.CENTER
-            bottomMargin = dp(25)
-        })
+        pageContent.addView(connectButton, LinearLayout.LayoutParams(dp(216), dp(216)).apply { gravity = android.view.Gravity.CENTER; bottomMargin = dp(18) })
+        status = TextView(this).apply { textSize = 14f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); setPadding(dp(12), dp(8), dp(12), dp(8)); background = rounded(0xFF171E19.toInt(), 100) }
+        pageContent.addView(status, params(0, 0, 0, 18))
+        val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER; setPadding(dp(18), dp(14), dp(18), dp(14)); background = rounded(0xFF101512.toInt(), 18, 0xFF29332B.toInt()); isClickable = true; isFocusable = true; setOnClickListener { showPage("servers") } }
+        card.addView(TextView(this).apply { text = "ВЫБРАННЫЙ СЕРВЕР"; textSize = 9f; setTextColor(0xFF89958C.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD })
+        servers = TextView(this).apply { textSize = 16f; gravity = android.view.Gravity.CENTER; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dp(5), 0, 0); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+        card.addView(servers)
+        pageContent.addView(card, LinearLayout.LayoutParams(-1, -2))
+        updateSavedState()
+    }
 
-        status = TextView(this).apply {
-            text = "●  Отключено"
-            textSize = 14f
-            gravity = android.view.Gravity.CENTER
-            setTextColor(muted)
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = rounded(panel2, 100)
+    private fun renderServersPage() {
+        pageContent.gravity = android.view.Gravity.TOP
+        pageContent.addView(TextView(this).apply { text = "СЕРВЕРЫ"; textSize = 24f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 8, 0, 5))
+        pageContent.addView(TextView(this).apply { text = "VLESS-ссылка или ссылка на подписку"; textSize = 12f; setTextColor(0xFF89958C.toInt()) }, params(0, 0, 0, 14))
+        pageContent.addView(Button(this).apply {
+            text = "＋\\nВСТАВИТЬ ИЗ БУФЕРА"; textSize = 15f; isAllCaps = false; gravity = android.view.Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(0xFFB7FF3C.toInt()); background = rounded(0xFF101512.toInt(), 24, 0xFFB7FF3C.toInt()); stateListAnimator = null
+            setOnClickListener { importClipboard() }
+        }, LinearLayout.LayoutParams(-1, dp(100)).apply { bottomMargin = dp(16) })
+        val outbounds = runCatching { JSONArray(prefs.getString("imported_outbounds_json", "[]")) }.getOrDefault(JSONArray())
+        if (outbounds.length() == 0) {
+            pageContent.addView(TextView(this).apply { text = "Серверов пока нет"; textSize = 14f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); setPadding(0, dp(22), 0, 0) }, LinearLayout.LayoutParams(-1, -2))
+            return
         }
-        center.addView(status, params(0, 0, 0, 24))
-
-        val selectedServerCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(18), dp(13), dp(18), dp(13))
-            background = rounded(panel, 18, 0xFF29332B.toInt())
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { openSavedServerPicker() }
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val selectedTag = prefs.getString("selected_server_tag", "")
+        for (i in 0 until outbounds.length()) {
+            val item = outbounds.optJSONObject(i) ?: continue
+            val name = item.optString("tag").ifBlank { item.optString("sendThrough").ifBlank { "Сервер " + (i + 1) } }
+            val selected = name == selectedTag
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL; setPadding(dp(16), dp(15), dp(16), dp(15))
+                background = rounded(if (selected) 0xFF1B2A1D.toInt() else 0xFF101512.toInt(), 16, if (selected) 0xFFB7FF3C.toInt() else 0xFF263128.toInt())
+                isClickable = true; isFocusable = true; setOnClickListener { selectServerAt(i) }
+            }
+            row.addView(TextView(this).apply { text = name; textSize = 15f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(TextView(this).apply { text = if (selected) "✓" else "›"; textSize = 20f; setTextColor(if (selected) 0xFFB7FF3C.toInt() else 0xFF89958C.toInt()) })
+            list.addView(row, params(0, 0, 0, 8))
         }
-        selectedServerCard.addView(TextView(this).apply {
-            text = "ВЫБРАННЫЙ СЕРВЕР"
-            textSize = 9f
-            letterSpacing = 0.14f
-            setTextColor(muted)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        })
-        servers = TextView(this).apply {
-            text = "Сервер не выбран"
-            textSize = 16f
-            gravity = android.view.Gravity.CENTER
-            setTextColor(white)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, dp(5), 0, 0)
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        selectedServerCard.addView(servers)
-        center.addView(selectedServerCard, LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(2)
-        })
-
-        val bottomNav = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(6), dp(7), dp(6), dp(7))
-            background = rounded(panel, 22, 0xFF202821.toInt())
-        }
-
-        val importButton = navButton("＋", "Добавить", neon, panel) { importClipboard() }
-        val serverButton = navButton("▦", "Серверы", white, panel2) { openSavedServerPicker() }
-        val settingsButton = navButton("⚙", "Настройки", muted, panel) {
-            status.text = "Настройки появятся позже"
-        }
-        bottomNav.addView(importButton, LinearLayout.LayoutParams(0, dp(58), 1f))
-        bottomNav.addView(serverButton, LinearLayout.LayoutParams(0, dp(58), 1f).apply {
-            leftMargin = dp(5)
-            rightMargin = dp(5)
-        })
-        bottomNav.addView(settingsButton, LinearLayout.LayoutParams(0, dp(58), 1f))
-        root.addView(bottomNav, params(0, 12, 0, 0))
-
-        setContentView(root)
-        renderConnectionState(prefs.getBoolean("connected", false))
+        scroll.addView(list)
+        pageContent.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     private fun navButton(symbol: String, title: String, color: Int, panel: Int, action: () -> Unit): LinearLayout {
-        val item = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(4), dp(5), dp(4), dp(5))
-            background = rounded(panel, 16)
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { action() }
-        }
-        item.addView(TextView(this).apply {
-            text = symbol
-            textSize = 20f
-            gravity = android.view.Gravity.CENTER
-            setTextColor(color)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        })
-        item.addView(TextView(this).apply {
-            text = title
-            textSize = 10f
-            gravity = android.view.Gravity.CENTER
-            setTextColor(color)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, dp(2), 0, 0)
-        })
+        val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER; setPadding(dp(4), dp(5), dp(4), dp(5)); background = rounded(panel, 16); isClickable = true; isFocusable = true; setOnClickListener { action() } }
+        item.addView(TextView(this).apply { text = symbol; textSize = 20f; gravity = android.view.Gravity.CENTER; setTextColor(color) })
+        item.addView(TextView(this).apply { text = title; textSize = 10f; gravity = android.view.Gravity.CENTER; setTextColor(color); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dp(2), 0, 0) })
         return item
     }
 
     private fun renderConnectionState(connected: Boolean) {
         if (!::connectButton.isInitialized) return
-        val bg = 0xFF050706.toInt()
         val panel = 0xFF101512.toInt()
         val neon = 0xFFB7FF3C.toInt()
         connectButton.text = if (connected) "⏻\\nОТКЛЮЧИТЬ" else "⏻\\nВКЛЮЧИТЬ"
-        connectButton.setTextColor(if (connected) bg else neon)
+        connectButton.setTextColor(if (connected) 0xFF050706.toInt() else neon)
         connectButton.background = if (connected) rounded(neon, 1000) else rounded(panel, 1000, neon)
     }
 
@@ -327,52 +250,56 @@ class MainActivity : Activity() {
     }
 
     private fun importText(text: String) {
-        if (text.isEmpty()) {
-            status.text = "Скопируй ссылку, подписку или JSON-конфигурацию"
-            return
-        }
-        val detectedType = detectImportType(text)
-        if (detectedType.startsWith("Hysteria")) {
-            status.text = "Найден Hysteria. Xray-core не запускает протокол Hysteria; нужен отдельный движок sing-box."
-            return
-        }
-        status.text = "Импорт: $detectedType..."
+        val sourceText = text.trim()
+        if (sourceText.isEmpty()) { status.text = "Скопируй VLESS-ссылку, подписку или JSON"; return }
+        status.text = "Проверяем ссылку или подписку..."
         Thread {
             try {
-                val input = if (text.startsWith("https://", true) || text.startsWith("http://", true)) {
-                    val connection = URL(text).openConnection() as HttpURLConnection
-                    connection.connectTimeout = 12000
-                    connection.readTimeout = 15000
-                    connection.setRequestProperty("User-Agent", "CosmoX/1.0")
+                val input = if (sourceText.startsWith("https://", true) || sourceText.startsWith("http://", true)) {
+                    val connection = URL(sourceText).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 20000
+                    connection.instanceFollowRedirects = true
+                    connection.setRequestProperty("User-Agent", "CosmoX/1.1")
+                    connection.setRequestProperty("Accept", "text/plain, */*")
                     try {
-                        val bytes = connection.inputStream.use { input ->
+                        val code = connection.responseCode
+                        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                        val bytes = stream?.use { inputStream ->
                             val output = java.io.ByteArrayOutputStream()
                             val buffer = ByteArray(8192)
                             var total = 0
                             while (true) {
-                                val count = input.read(buffer)
+                                val count = inputStream.read(buffer)
                                 if (count < 0) break
                                 total += count
-                                require(total <= 4 * 1024 * 1024) { "Подписка слишком большая (лимит 4 МБ)" }
+                                require(total <= 8 * 1024 * 1024) { "Подписка слишком большая (лимит 8 МБ)" }
                                 output.write(buffer, 0, count)
                             }
                             output.toByteArray()
-                        }
-                        String(bytes, StandardCharsets.UTF_8)
+                        } ?: byteArrayOf()
+                        if (code !in 200..299) error("Сервер подписки вернул HTTP " + code)
+                        String(bytes, StandardCharsets.UTF_8).trim()
                     } finally { connection.disconnect() }
-                } else text
-                val normalizedInput = input.trim()
-                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", normalizedInput))
-                val data = response.optJSONObject("data") ?: error("Парсер не вернул серверы")
-                val outbounds = data.optJSONArray("outbounds") ?: error("В подписке нет поддерживаемых серверов")
-                require(outbounds.length() > 0) { "В ссылке не найдено серверов" }
+                } else sourceText
+                val normalized = input.trim().removePrefix("\uFEFF").replace("\r\n", "\n")
+                require(normalized.isNotBlank()) { "Подписка пустая" }
+                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", normalized))
+                val data = response.optJSONObject("data") ?: error("Парсер не вернул список серверов")
+                val outbounds = data.optJSONArray("outbounds") ?: error("В ссылке не найден список серверов")
                 val selectable = selectableOutbounds(outbounds)
-                require(selectable.length() > 0) { "В подписке нет поддерживаемых прокси-серверов" }
+                require(selectable.length() > 0) { "Не найдено поддерживаемых серверов. Проверь ссылку и формат подписки." }
                 runOnUiThread {
-                    showServerPicker(outbounds, text, true)
+                    prefs.edit().putString("imported_outbounds_json", selectable.toString()).putString("profile_source", sourceText).putInt("server_count", selectable.length()).apply()
+                    showPage("servers")
+                    status.text = "Импортировано серверов: " + selectable.length()
                 }
             } catch (e: Exception) {
-                runOnUiThread { status.text = "Ошибка импорта: ${e.message ?: "неизвестная ошибка"}" }
+                val reason = e.message?.takeIf { it.isNotBlank() } ?: "неизвестная ошибка"
+                runOnUiThread {
+                    if (::status.isInitialized) status.text = "Импорт не удался: " + reason
+                    if (currentPage == "servers") pageContent.addView(TextView(this).apply { text = "Ошибка импорта: " + reason; textSize = 12f; setTextColor(0xFFFF7777.toInt()); setPadding(dp(4), dp(8), dp(4), dp(8)) })
+                }
             }
         }.start()
     }
@@ -383,7 +310,7 @@ class MainActivity : Activity() {
             val item = outbounds.optJSONObject(i) ?: continue
             val protocol = item.optString("protocol").lowercase()
             if (protocol !in setOf("freedom", "direct", "blackhole", "block", "dns", "")) {
-                if (item.optString("tag").isBlank()) item.put("tag", "proxy-${result.length() + 1}")
+                if (item.optString("tag").isBlank()) item.put("tag", item.optString("sendThrough").ifBlank { "Сервер " + (result.length() + 1) })
                 result.put(item)
             }
         }
@@ -401,70 +328,30 @@ class MainActivity : Activity() {
         return "$tag  •  $protocol$endpoint"
     }
 
-    private fun showServerPicker(outbounds: JSONArray, source: String, isNewImport: Boolean) {
-        val choices = selectableOutbounds(outbounds)
-        if (choices.length() == 0) {
-            status.text = "Нет доступных серверов"
-            return
+    private fun selectServerAt(index: Int) {
+        try {
+            val outbounds = JSONArray(prefs.getString("imported_outbounds_json", "[]"))
+            require(index in 0 until outbounds.length()) { "Сервер не найден" }
+            val chosen = outbounds.getJSONObject(index)
+            val tag = chosen.optString("tag").ifBlank { chosen.optString("sendThrough").ifBlank { "proxy-" + (index + 1) } }
+            chosen.put("tag", tag)
+            outbounds.put(index, chosen)
+            val config = JSONObject()
+                .put("log", JSONObject().put("loglevel", "warning").put("access", "none"))
+                .put("inbounds", JSONArray().put(JSONObject().put("tag", "tun-in").put("port", 0).put("protocol", "tun").put("settings", JSONObject().put("name", "CosmoX").put("mtu", 1500))))
+                .put("outbounds", outbounds)
+                .put("dns", JSONObject().put("servers", JSONArray().put("1.1.1.1").put("2606:4700:4700::1111")))
+                .put("routing", JSONObject().put("domainStrategy", "IPIfNonMatch").put("rules", JSONArray().put(JSONObject().put("type", "field").put("inboundTag", JSONArray().put("tun-in")).put("outboundTag", tag))))
+            prefs.edit().putString(CosmoVpnService.KEY_CONFIG, config.toString()).putString("imported_outbounds_json", outbounds.toString()).putString("selected_server_tag", tag).putString("selected_server_name", tag).putInt("server_count", outbounds.length()).apply()
+            if (::status.isInitialized) status.text = "Выбран сервер: " + tag
+            showPage("servers")
+        } catch (e: Exception) {
+            if (::status.isInitialized) status.text = "Не удалось выбрать сервер: " + (e.message ?: "ошибка")
         }
-        val labels = Array(choices.length()) { index ->
-            val item = choices.optJSONObject(index) ?: JSONObject()
-            item.optString("tag").ifBlank { "Сервер ${index + 1}" }
-        }
-        AlertDialog.Builder(this)
-            .setTitle(if (isNewImport) "Выбери сервер подписки" else "Выбрать сервер")
-            .setMessage("Подключение будет использовать выбранный сервер. Выбор можно изменить позже.")
-            .setItems(labels) { _, which ->
-                try {
-                    val chosen = choices.getJSONObject(which)
-                    var tag = chosen.optString("tag")
-                    if (tag.isBlank()) {
-                        tag = "proxy-${which + 1}"
-                        chosen.put("tag", tag)
-                    }
-                    val config = JSONObject()
-                        .put("log", JSONObject().put("loglevel", "warning").put("access", "none"))
-                        .put("inbounds", JSONArray().put(JSONObject()
-                            .put("tag", "tun-in").put("port", 0).put("protocol", "tun")
-                            .put("settings", JSONObject().put("name", "CosmoX").put("mtu", 1500))))
-                        .put("outbounds", outbounds)
-                        .put("dns", JSONObject().put("servers", JSONArray().put("1.1.1.1").put("2606:4700:4700::1111")))
-                        .put("routing", JSONObject()
-                            .put("domainStrategy", "IPIfNonMatch")
-                            .put("rules", JSONArray().put(JSONObject()
-                                .put("type", "field")
-                                .put("inboundTag", JSONArray().put("tun-in"))
-                                .put("outboundTag", tag))))
-                    prefs.edit()
-                        .putString(CosmoVpnService.KEY_CONFIG, config.toString())
-                        .putString("profile_source", source)
-                        .putInt("server_count", choices.length())
-                        .putString("selected_server_tag", tag)
-                        .putString("selected_server_name", chosen.optString("tag").ifBlank { "Сервер ${which + 1}" })
-                        .apply()
-                    status.text = "Выбран сервер: ${chosen.optString("tag").ifBlank { "Сервер ${which + 1}" }}"
-                    updateSavedState()
-                } catch (e: Exception) {
-                    status.text = "Не удалось выбрать сервер: ${e.message ?: "ошибка"}"
-                }
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
     }
 
     private fun openSavedServerPicker() {
-        val saved = prefs.getString(CosmoVpnService.KEY_CONFIG, null)
-        if (saved.isNullOrBlank()) {
-            status.text = "Сначала импортируй подписку"
-            return
-        }
-        try {
-            val root = JSONObject(saved)
-            val outbounds = root.optJSONArray("outbounds") ?: JSONArray()
-            showServerPicker(outbounds, prefs.getString("profile_source", "").orEmpty(), false)
-        } catch (e: Exception) {
-            status.text = "Не удалось открыть список серверов"
-        }
+        showPage("servers")
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
@@ -547,12 +434,12 @@ class MainActivity : Activity() {
     }
 
     private fun updateSavedState() {
-        val count = prefs.getInt("server_count", 0)
-        val selected = prefs.getString("selected_server_name", null)
-        servers.text = if (count > 0) selected ?: "Сервер не выбран" else "Сервер не выбран"
-        val connected = prefs.getBoolean("connected", false)
-        status.text = if (connected) "●  Подключено • Xray-core" else "●  Отключено"
-        renderConnectionState(connected)
+        if (::servers.isInitialized) servers.text = prefs.getString("selected_server_name", null) ?: "Сервер не выбран"
+        if (::status.isInitialized) {
+            val connected = prefs.getBoolean("connected", false)
+            status.text = if (connected) "●  Подключено • Xray-core" else "●  Отключено"
+            renderConnectionState(connected)
+        }
     }
 
     override fun onDestroy() {
