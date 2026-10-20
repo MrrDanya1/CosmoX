@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets
 
 class MainActivity : Activity() {
     private lateinit var status: TextView
+    private lateinit var importMessage: TextView
     private lateinit var servers: TextView
     private lateinit var connectButton: Button
     private val permissionRequest = 4101
@@ -127,35 +128,73 @@ class MainActivity : Activity() {
     private fun renderServersPage() {
         pageContent.gravity = android.view.Gravity.TOP
         pageContent.addView(TextView(this).apply { text = "СЕРВЕРЫ"; textSize = 24f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 8, 0, 5))
-        pageContent.addView(TextView(this).apply { text = "VLESS-ссылка или ссылка на подписку"; textSize = 12f; setTextColor(0xFF89958C.toInt()) }, params(0, 0, 0, 14))
-        pageContent.addView(Button(this).apply {
-            text = "＋\\nВСТАВИТЬ ИЗ БУФЕРА"; textSize = 15f; isAllCaps = false; gravity = android.view.Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(0xFFB7FF3C.toInt()); background = rounded(0xFF101512.toInt(), 24, 0xFFB7FF3C.toInt()); stateListAnimator = null
-            setOnClickListener { importClipboard() }
-        }, LinearLayout.LayoutParams(-1, dp(100)).apply { bottomMargin = dp(16) })
-        val outbounds = runCatching { JSONArray(prefs.getString("imported_outbounds_json", "[]")) }.getOrDefault(JSONArray())
-        if (outbounds.length() == 0) {
-            pageContent.addView(TextView(this).apply { text = "Серверов пока нет"; textSize = 14f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); setPadding(0, dp(22), 0, 0) }, LinearLayout.LayoutParams(-1, -2))
-            return
+        pageContent.addView(TextView(this).apply { text = "Подписки и серверы"; textSize = 12f; setTextColor(0xFF89958C.toInt()) }, params(0, 0, 0, 10))
+
+        val source = prefs.getString("profile_source", "").orEmpty()
+        if (source.isNotBlank()) {
+            val isUrl = source.startsWith("https://", true) || source.startsWith("http://", true)
+            val host = if (isUrl) runCatching { URL(source).host }.getOrDefault("Подписка") else "Импортированный список"
+            val profile = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(10), dp(10), dp(10))
+                background = rounded(0xFF101512.toInt(), 16, 0xFF263128.toInt())
+            }
+            val profileText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            profileText.addView(TextView(this).apply { text = "ПОДПИСКА"; textSize = 9f; setTextColor(0xFFB7FF3C.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD })
+            profileText.addView(TextView(this).apply { text = host; textSize = 13f; setTextColor(0xFFF4F7F2.toInt()); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+            profileText.addView(TextView(this).apply { text = outboundsCountLabel(); textSize = 11f; setTextColor(0xFF89958C.toInt()) })
+            profile.addView(profileText, LinearLayout.LayoutParams(0, -2, 1f))
+            if (isUrl) {
+                profile.addView(Button(this).apply {
+                    text = "↻"; textSize = 20f; isAllCaps = false; setTextColor(0xFFB7FF3C.toInt())
+                    background = rounded(0xFF1B2A1D.toInt(), 12); stateListAnimator = null
+                    contentDescription = "Обновить подписку"
+                    setOnClickListener { importText(source) }
+                }, LinearLayout.LayoutParams(dp(48), dp(44)))
+            }
+            pageContent.addView(profile, params(0, 0, 0, 10))
         }
+
+        importMessage = TextView(this).apply {
+            text = prefs.getString("last_import_message", "").orEmpty()
+            textSize = 11f; setTextColor(0xFFB7FF3C.toInt()); setPadding(dp(2), 0, dp(2), dp(6))
+            visibility = if (text.isBlank()) android.view.View.GONE else android.view.View.VISIBLE
+        }
+        pageContent.addView(importMessage, params(0, 0, 0, 4))
+
+        val outbounds = runCatching { JSONArray(prefs.getString("imported_outbounds_json", "[]")) }.getOrDefault(JSONArray())
         val scroll = ScrollView(this)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val selectedTag = prefs.getString("selected_server_tag", "")
-        for (i in 0 until outbounds.length()) {
-            val item = outbounds.optJSONObject(i) ?: continue
-            val name = item.optString("tag").ifBlank { item.optString("sendThrough").ifBlank { "Сервер " + (i + 1) } }
-            val selected = name == selectedTag
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL; setPadding(dp(16), dp(15), dp(16), dp(15))
-                background = rounded(if (selected) 0xFF1B2A1D.toInt() else 0xFF101512.toInt(), 16, if (selected) 0xFFB7FF3C.toInt() else 0xFF263128.toInt())
-                isClickable = true; isFocusable = true; setOnClickListener { selectServerAt(i) }
+        if (outbounds.length() == 0) {
+            list.addView(TextView(this).apply { text = "Серверов пока нет"; textSize = 14f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); setPadding(0, dp(24), 0, 0) }, LinearLayout.LayoutParams(-1, -2))
+        } else {
+            val selectedTag = prefs.getString("selected_server_tag", "")
+            for (i in 0 until outbounds.length()) {
+                val item = outbounds.optJSONObject(i) ?: continue
+                val name = item.optString("tag").ifBlank { item.optString("sendThrough").ifBlank { "Сервер " + (i + 1) } }
+                val selected = name == selectedTag
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL; setPadding(dp(16), dp(15), dp(16), dp(15))
+                    background = rounded(if (selected) 0xFF1B2A1D.toInt() else 0xFF101512.toInt(), 16, if (selected) 0xFFB7FF3C.toInt() else 0xFF263128.toInt())
+                    isClickable = true; isFocusable = true; setOnClickListener { selectServerAt(i) }
+                }
+                row.addView(TextView(this).apply { text = name; textSize = 15f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
+                row.addView(TextView(this).apply { text = if (selected) "✓" else "›"; textSize = 20f; setTextColor(if (selected) 0xFFB7FF3C.toInt() else 0xFF89958C.toInt()) })
+                list.addView(row, params(0, 0, 0, 8))
             }
-            row.addView(TextView(this).apply { text = name; textSize = 15f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(TextView(this).apply { text = if (selected) "✓" else "›"; textSize = 20f; setTextColor(if (selected) 0xFFB7FF3C.toInt() else 0xFF89958C.toInt()) })
-            list.addView(row, params(0, 0, 0, 8))
         }
         scroll.addView(list)
         pageContent.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        pageContent.addView(Button(this).apply {
+            text = "＋\nВСТАВИТЬ ИЗ БУФЕРА"; textSize = 14f; isAllCaps = false; gravity = android.view.Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(0xFFB7FF3C.toInt()); background = rounded(0xFF101512.toInt(), 20, 0xFFB7FF3C.toInt()); stateListAnimator = null
+            setOnClickListener { importClipboard() }
+        }, LinearLayout.LayoutParams(-1, dp(68)).apply { topMargin = dp(8) })
+    }
+
+    private fun outboundsCountLabel(): String {
+        val count = runCatching { JSONArray(prefs.getString("imported_outbounds_json", "[]")).length() }.getOrDefault(0)
+        return "$count серверов"
     }
 
     private fun navButton(symbol: String, title: String, color: Int, panel: Int, action: () -> Unit): LinearLayout {
@@ -282,35 +321,115 @@ class MainActivity : Activity() {
                         String(bytes, StandardCharsets.UTF_8).trim()
                     } finally { connection.disconnect() }
                 } else sourceText
-                val normalized = input.trim().removePrefix("\uFEFF").replace("\r\n", "\n")
+                val normalized = input.trim().removePrefix("\uFEFF").replace("\r\n", "\n").replace("\r", "\n")
                 require(normalized.isNotBlank()) { "Подписка пустая" }
-                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", normalized))
-                val data = response.optJSONObject("data") ?: error("Парсер не вернул список серверов")
-                val outbounds = data.optJSONArray("outbounds") ?: error("В ссылке не найден список серверов")
-                val selectable = selectableOutbounds(outbounds)
-                require(selectable.length() > 0) { "Не найдено поддерживаемых серверов. Проверь ссылку и формат подписки." }
+                val parsed = convertSubscriptionInOrder(normalized)
+                val selectable = selectableOutbounds(parsed.first)
+                require(selectable.length() > 0) { "Не найдено поддерживаемых серверов. Проверь формат подписки: поддерживаются VLESS, VMess, Trojan, Shadowsocks и совместимые ссылки Xray." }
+                val message = if (parsed.second > 0) {
+                    "Импортировано: " + selectable.length() + " • пропущено неподдерживаемых: " + parsed.second
+                } else {
+                    "Импортировано серверов: " + selectable.length()
+                }
                 runOnUiThread {
-                    prefs.edit().putString("imported_outbounds_json", selectable.toString()).putString("profile_source", sourceText).putInt("server_count", selectable.length()).apply()
+                    prefs.edit().putString("imported_outbounds_json", selectable.toString()).putString("profile_source", sourceText).putInt("server_count", selectable.length()).putString("last_import_message", message).apply()
                     showPage("servers")
-                    status.text = "Импортировано серверов: " + selectable.length()
+                    if (::status.isInitialized) status.text = message
                 }
             } catch (e: Exception) {
                 val reason = e.message?.takeIf { it.isNotBlank() } ?: "неизвестная ошибка"
                 runOnUiThread {
-                    if (::status.isInitialized) status.text = "Импорт не удался: " + reason
-                    if (currentPage == "servers") pageContent.addView(TextView(this).apply { this.text = "Ошибка импорта: " + reason; textSize = 12f; setTextColor(0xFFFF7777.toInt()); setPadding(dp(4), dp(8), dp(4), dp(8)) })
+                    val message = "Ошибка импорта: " + reason
+                    if (::status.isInitialized) status.text = message
+                    prefs.edit().putString("last_import_message", message).apply()
+                    if (currentPage == "servers") {
+                        if (::importMessage.isInitialized) {
+                            importMessage.text = message
+                            importMessage.setTextColor(0xFFFF7777.toInt())
+                            importMessage.visibility = android.view.View.VISIBLE
+                        } else {
+                            pageContent.addView(TextView(this).apply { this.text = message; textSize = 12f; setTextColor(0xFFFF7777.toInt()); setPadding(dp(4), dp(8), dp(4), dp(8)) })
+                        }
+                    }
                 }
             }
         }.start()
     }
 
+    private fun convertSubscriptionInOrder(text: String): Pair<JSONArray, Int> {
+        val source = text.trim().removePrefix("\uFEFF")
+        if (source.startsWith("{")) {
+            val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", source))
+            val data = response.optJSONObject("data") ?: error("Парсер не вернул список серверов")
+            return Pair(data.optJSONArray("outbounds") ?: error("В JSON не найден список серверов"), 0)
+        }
+
+        var payload = source
+        if (!payload.contains("://")) {
+            val compact = payload.filterNot { it.isWhitespace() }
+            val decoded = runCatching {
+                val bytes = android.util.Base64.decode(compact, android.util.Base64.DEFAULT or android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+                String(bytes, StandardCharsets.UTF_8).trim().removePrefix("\uFEFF")
+            }.getOrNull()
+            if (!decoded.isNullOrBlank() && decoded.contains("://")) payload = decoded
+        }
+
+        val lines = payload.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            .map { it.trim() }
+            .filter { it.contains("://") && !it.startsWith("#") && !it.startsWith("//") }
+        if (lines.isEmpty()) {
+            val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", source))
+            val data = response.optJSONObject("data") ?: error("Формат подписки не распознан")
+            return Pair(data.optJSONArray("outbounds") ?: error("Парсер не вернул список серверов"), 0)
+        }
+
+        val combined = JSONArray()
+        val usedTags = mutableSetOf<String>()
+        var skipped = 0
+        for (line in lines) {
+            try {
+                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", line))
+                val data = response.optJSONObject("data") ?: error("Некорректная ссылка")
+                val outbounds = data.optJSONArray("outbounds") ?: error("Сервер не распознан")
+                if (outbounds.length() == 0) { skipped++; continue }
+                for (i in 0 until outbounds.length()) {
+                    val item = outbounds.optJSONObject(i) ?: continue
+                    val originalTag = item.optString("tag").ifBlank { item.optString("sendThrough").ifBlank { "Сервер " + (combined.length() + 1) } }
+                    var uniqueTag = originalTag
+                    var suffix = 2
+                    while (usedTags.contains(uniqueTag)) {
+                        uniqueTag = "$originalTag ($suffix)"
+                        suffix++
+                    }
+                    usedTags.add(uniqueTag)
+                    item.put("tag", uniqueTag)
+                    combined.put(item)
+                }
+            } catch (_: Exception) {
+                skipped++
+            }
+        }
+        if (combined.length() == 0) {
+            val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", source))
+            val data = response.optJSONObject("data") ?: error("Не удалось распознать подписку")
+            return Pair(data.optJSONArray("outbounds") ?: error("Парсер не вернул список серверов"), skipped)
+        }
+        return Pair(combined, skipped)
+    }
+
     private fun selectableOutbounds(outbounds: JSONArray): JSONArray {
         val result = JSONArray()
+        val usedTags = mutableSetOf<String>()
         for (i in 0 until outbounds.length()) {
             val item = outbounds.optJSONObject(i) ?: continue
             val protocol = item.optString("protocol").lowercase()
             if (protocol !in setOf("freedom", "direct", "blackhole", "block", "dns", "")) {
-                if (item.optString("tag").isBlank()) item.put("tag", item.optString("sendThrough").ifBlank { "Сервер " + (result.length() + 1) })
+                val baseTag = item.optString("tag").ifBlank { item.optString("sendThrough").ifBlank { "Сервер " + (result.length() + 1) } }
+                var tag = baseTag
+                var suffix = 2
+                while (usedTags.contains(tag)) { tag = "$baseTag ($suffix)"; suffix++ }
+                usedTags.add(tag)
+                item.put("tag", tag)
                 result.put(item)
             }
         }
