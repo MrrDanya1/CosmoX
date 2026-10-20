@@ -208,7 +208,7 @@ class MainActivity : Activity() {
         if (!::connectButton.isInitialized) return
         val panel = 0xFF101512.toInt()
         val neon = 0xFFB7FF3C.toInt()
-        connectButton.text = if (connected) "⏻\\nОТКЛЮЧИТЬ" else "⏻\\nВКЛЮЧИТЬ"
+        connectButton.text = if (connected) "⏻\nОТКЛЮЧИТЬ" else "⏻\nВКЛЮЧИТЬ"
         connectButton.setTextColor(if (connected) 0xFF050706.toInt() else neon)
         connectButton.background = if (connected) rounded(neon, 1000) else rounded(panel, 1000, neon)
     }
