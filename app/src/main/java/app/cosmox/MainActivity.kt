@@ -298,7 +298,7 @@ class MainActivity : Activity() {
                 val reason = e.message?.takeIf { it.isNotBlank() } ?: "неизвестная ошибка"
                 runOnUiThread {
                     if (::status.isInitialized) status.text = "Импорт не удался: " + reason
-                    if (currentPage == "servers") pageContent.addView(TextView(this).apply { text = "Ошибка импорта: " + reason; textSize = 12f; setTextColor(0xFFFF7777.toInt()); setPadding(dp(4), dp(8), dp(4), dp(8)) })
+                    if (currentPage == "servers") pageContent.addView(TextView(this).apply { this.text = "Ошибка импорта: " + reason; textSize = 12f; setTextColor(0xFFFF7777.toInt()); setPadding(dp(4), dp(8), dp(4), dp(8)) })
                 }
             }
         }.start()
