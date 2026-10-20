@@ -368,10 +368,13 @@ class MainActivity : Activity() {
         if (!payload.contains("://")) {
             val compact = payload.filterNot { it.isWhitespace() }
             val decoded = runCatching {
-                val bytes = android.util.Base64.decode(compact, android.util.Base64.DEFAULT or android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
-                String(bytes, StandardCharsets.UTF_8).trim().removePrefix("\uFEFF")
-            }.getOrNull()
-            if (!decoded.isNullOrBlank() && decoded.contains("://")) payload = decoded
+                String(android.util.Base64.decode(compact, android.util.Base64.DEFAULT), StandardCharsets.UTF_8)
+            }.getOrNull()?.takeIf { it.contains("://") }
+                ?: runCatching {
+                    String(android.util.Base64.decode(compact, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP), StandardCharsets.UTF_8)
+                }.getOrNull()
+            val cleanDecoded = decoded?.trim()?.removePrefix("\uFEFF")
+            if (!cleanDecoded.isNullOrBlank() && cleanDecoded.contains("://")) payload = cleanDecoded
         }
 
         val lines = payload.replace("\r\n", "\n").replace("\r", "\n").split("\n")
