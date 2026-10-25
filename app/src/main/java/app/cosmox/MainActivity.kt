@@ -10,6 +10,8 @@ import android.content.IntentFilter
 import android.net.VpnService
 import android.os.Bundle
 import android.view.ViewGroup
+import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -96,6 +98,20 @@ class MainActivity : Activity() {
             }
             else -> renderHomePage()
         }
+        animatePageContent()
+    }
+
+    private fun animatePageContent() {
+        for (i in 0 until pageContent.childCount) {
+            val child = pageContent.getChildAt(i)
+            child.alpha = 0f
+            child.translationY = dp(12).toFloat()
+            child.animate().alpha(1f).translationY(0f)
+                .setStartDelay((i * 35L).coerceAtMost(140L))
+                .setDuration(230L)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        }
     }
 
     private fun renderHomePage() {
@@ -157,7 +173,9 @@ class MainActivity : Activity() {
 
         importMessage = TextView(this).apply {
             text = prefs.getString("last_import_message", "").orEmpty()
-            textSize = 11f; setTextColor(0xFFB7FF3C.toInt()); setPadding(dp(2), 0, dp(2), dp(6))
+            textSize = 12f
+            setTextColor(if (text.startsWith("Ошибка", true)) 0xFFFF7777.toInt() else 0xFFB7FF3C.toInt())
+            setPadding(dp(2), dp(2), dp(2), dp(6))
             visibility = if (text.isBlank()) android.view.View.GONE else android.view.View.VISIBLE
         }
         pageContent.addView(importMessage, params(0, 0, 0, 4))
@@ -174,13 +192,59 @@ class MainActivity : Activity() {
                 val name = item.optString("tag").ifBlank { item.optString("sendThrough").ifBlank { "Сервер " + (i + 1) } }
                 val selected = name == selectedTag
                 val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL; setPadding(dp(16), dp(15), dp(16), dp(15))
-                    background = rounded(if (selected) 0xFF1B2A1D.toInt() else 0xFF101512.toInt(), 16, if (selected) 0xFFB7FF3C.toInt() else 0xFF263128.toInt())
-                    isClickable = true; isFocusable = true; setOnClickListener { selectServerAt(i) }
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(dp(15), dp(13), dp(14), dp(13))
+                    background = rounded(if (selected) 0xFF19251B.toInt() else 0xFF101512.toInt(), 17, if (selected) 0xFFB7FF3C.toInt() else 0xFF263128.toInt())
+                    isClickable = true
+                    isFocusable = true
+                    foreground = android.util.TypedValue().let { value ->
+                        val attrs = intArrayOf(android.R.attr.selectableItemBackground)
+                        val typed = obtainStyledAttributes(attrs)
+                        val drawable = typed.getDrawable(0)
+                        typed.recycle()
+                        drawable
+                    }
+                    setOnClickListener {
+                        animate().scaleX(0.985f).scaleY(0.985f).setDuration(70L).withEndAction {
+                            animate().scaleX(1f).scaleY(1f).setDuration(100L).start()
+                            selectServerAt(i)
+                        }.start()
+                    }
                 }
-                row.addView(TextView(this).apply { text = name; textSize = 15f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
-                row.addView(TextView(this).apply { text = if (selected) "✓" else "›"; textSize = 20f; setTextColor(if (selected) 0xFFB7FF3C.toInt() else 0xFF89958C.toInt()) })
-                list.addView(row, params(0, 0, 0, 8))
+                val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+                details.addView(TextView(this).apply {
+                    text = name
+                    textSize = 15f
+                    setTextColor(0xFFF4F7F2.toInt())
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+                val protocol = item.optString("protocol").uppercase().ifBlank { "PROXY" }
+                val serverSettings = item.optJSONObject("settings")?.optJSONArray("servers")
+                val endpoint = serverSettings?.optJSONObject(0)?.let { server ->
+                    val address = server.optString("address")
+                    val port = server.optInt("port", -1)
+                    if (address.isNotBlank()) address + if (port > 0) ":$port" else "" else ""
+                }.orEmpty()
+                details.addView(TextView(this).apply {
+                    text = if (endpoint.isNotBlank()) "$protocol  •  $endpoint" else protocol
+                    textSize = 11f
+                    setTextColor(0xFF89958C.toInt())
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+                    setPadding(0, dp(4), 0, 0)
+                })
+                row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
+                row.addView(TextView(this).apply {
+                    text = if (selected) "✓" else "›"
+                    textSize = if (selected) 18f else 22f
+                    gravity = android.view.Gravity.CENTER
+                    setTextColor(if (selected) 0xFFB7FF3C.toInt() else 0xFF89958C.toInt())
+                    setPadding(dp(10), 0, 0, 0)
+                })
+                list.addView(row, params(0, 0, 0, 9))
             }
         }
         scroll.addView(list)
