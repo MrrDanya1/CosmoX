@@ -420,31 +420,65 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    /**
+     * Извлекает ссылки в исходном порядке, как это делал HappX:
+     * ищет ссылки по всему тексту (не только по одной ссылке на строку),
+     * поддерживает несколько уровней Base64 и убирает только дубликаты.
+     */
+    private fun extractShareLinksInOrder(rawBody: String): List<String> {
+        val linkRegex = Regex("(?i)(?:vless|vmess|trojan|ss)://[^\\s\\\"'<>]+")
+        fun supportedLinks(value: String): List<String> = linkRegex.findAll(value)
+            .map { it.value.trim().trimEnd(',', ';', ')', ']', '}', '.') }
+            .filter { it.startsWith("vmess://", true) || it.contains('@') }
+            .distinct()
+            .toList()
+
+        val queue = java.util.ArrayDeque<String>()
+        val seen = mutableSetOf<String>()
+        queue.add(rawBody.removePrefix("\uFEFF").trim())
+
+        repeat(3) {
+            val batch = queue.toList()
+            queue.clear()
+            for (value in batch) {
+                if (value.isBlank() || !seen.add(value)) continue
+                val links = supportedLinks(value)
+                if (links.isNotEmpty()) return links
+
+                val compact = value.filterNot { it.isWhitespace() }
+                if (compact.length >= 16) {
+                    val flagsList = listOf(
+                        android.util.Base64.DEFAULT,
+                        android.util.Base64.URL_SAFE,
+                        android.util.Base64.NO_WRAP,
+                        android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP
+                    )
+                    for (flags in flagsList) {
+                        val decoded = runCatching {
+                            String(android.util.Base64.decode(compact, flags), StandardCharsets.UTF_8)
+                        }.getOrNull()
+                        if (!decoded.isNullOrBlank() && decoded != value && decoded.any { it.isLetterOrDigit() }) {
+                            queue.add(decoded)
+                        }
+                    }
+                }
+            }
+        }
+        return emptyList()
+    }
+
     private fun convertSubscriptionInOrder(text: String): Pair<JSONArray, Int> {
         val source = text.trim().removePrefix("\uFEFF")
-        if (source.startsWith("{")) {
+        if (source.startsWith("{") || source.startsWith("[")) {
             val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", source))
             val data = response.optJSONObject("data") ?: error("Парсер не вернул список серверов")
             return Pair(data.optJSONArray("outbounds") ?: error("В JSON не найден список серверов"), 0)
         }
 
-        var payload = source
-        if (!payload.contains("://")) {
-            val compact = payload.filterNot { it.isWhitespace() }
-            val decoded = runCatching {
-                String(android.util.Base64.decode(compact, android.util.Base64.DEFAULT), StandardCharsets.UTF_8)
-            }.getOrNull()?.takeIf { it.contains("://") }
-                ?: runCatching {
-                    String(android.util.Base64.decode(compact, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP), StandardCharsets.UTF_8)
-                }.getOrNull()
-            val cleanDecoded = decoded?.trim()?.removePrefix("\uFEFF")
-            if (!cleanDecoded.isNullOrBlank() && cleanDecoded.contains("://")) payload = cleanDecoded
-        }
-
-        val lines = payload.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-            .map { it.trim() }
-            .filter { it.contains("://") && !it.startsWith("#") && !it.startsWith("//") }
-        if (lines.isEmpty()) {
+        // Не разбиваем по строкам: HappX находил ссылки регулярным выражением
+        // по всему телу ответа, сохраняя их фактическую последовательность.
+        val links = extractShareLinksInOrder(source)
+        if (links.isEmpty()) {
             val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", source))
             val data = response.optJSONObject("data") ?: error("Формат подписки не распознан")
             return Pair(data.optJSONArray("outbounds") ?: error("Парсер не вернул список серверов"), 0)
@@ -453,19 +487,24 @@ class MainActivity : Activity() {
         val combined = JSONArray()
         val usedTags = mutableSetOf<String>()
         var skipped = 0
-        for (line in lines) {
+        for (link in links) {
             try {
-                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", line))
+                val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", link))
                 val data = response.optJSONObject("data") ?: error("Некорректная ссылка")
                 val outbounds = data.optJSONArray("outbounds") ?: error("Сервер не распознан")
-                if (outbounds.length() == 0) { skipped++; continue }
+                if (outbounds.length() == 0) {
+                    skipped++
+                    continue
+                }
                 for (i in 0 until outbounds.length()) {
                     val item = outbounds.optJSONObject(i) ?: continue
-                    val originalTag = item.optString("tag").ifBlank { item.optString("sendThrough").ifBlank { "Сервер " + (combined.length() + 1) } }
+                    val originalTag = item.optString("tag").ifBlank {
+                        item.optString("sendThrough").ifBlank { "Сервер " + (combined.length() + 1) }
+                    }
                     var uniqueTag = originalTag
                     var suffix = 2
                     while (usedTags.contains(uniqueTag)) {
-                        uniqueTag = "$originalTag ($suffix)"
+                        uniqueTag = originalTag + " (" + suffix + ")"
                         suffix++
                     }
                     usedTags.add(uniqueTag)
@@ -476,11 +515,7 @@ class MainActivity : Activity() {
                 skipped++
             }
         }
-        if (combined.length() == 0) {
-            val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", source))
-            val data = response.optJSONObject("data") ?: error("Не удалось распознать подписку")
-            return Pair(data.optJSONArray("outbounds") ?: error("Парсер не вернул список серверов"), skipped)
-        }
+        if (combined.length() == 0) error("Не удалось распознать серверы подписки")
         return Pair(combined, skipped)
     }
 
