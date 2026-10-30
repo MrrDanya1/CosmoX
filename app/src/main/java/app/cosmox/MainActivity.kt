@@ -228,32 +228,171 @@ class MainActivity : Activity() {
 
     private fun renderServersPage() {
         pageContent.gravity = android.view.Gravity.TOP
-        pageContent.addView(TextView(this).apply { text = "СЕРВЕРЫ"; textSize = 24f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 8, 0, 5))
-        pageContent.addView(TextView(this).apply { text = "Подписки и серверы"; textSize = 12f; setTextColor(0xFF89958C.toInt()) }, params(0, 0, 0, 10))
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val headingText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        headingText.addView(label("ТВОИ ПОДКЛЮЧЕНИЯ", 0xFFB7FF3C.toInt(), 10f, 0).apply { typeface = android.graphics.Typeface.DEFAULT_BOLD })
+        headingText.addView(TextView(this).apply {
+            text = "Серверы"
+            textSize = 26f
+            setTextColor(0xFFF1F6ED.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        heading.addView(headingText, LinearLayout.LayoutParams(0, -2, 1f))
+        heading.addView(TextView(this).apply {
+            text = outboundsCountLabel()
+            textSize = 10f
+            setTextColor(0xFF899689.toInt())
+        })
+        pageContent.addView(heading, params(0, 8, 0, 12))
 
         val source = prefs.getString("profile_source", "").orEmpty()
         if (source.isNotBlank()) {
             val isUrl = source.startsWith("https://", true) || source.startsWith("http://", true)
-            val host = if (isUrl) runCatching { URL(source).host }.getOrDefault("Подписка") else "Импортированный список"
-            val profile = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(10), dp(10), dp(10))
-                background = rounded(0xFF101512.toInt(), 16, 0xFF263128.toInt())
+            val defaultName = if (isUrl) runCatching { URL(source).host }.getOrDefault("Подписка") else "Импортированный список"
+            val displayName = prefs.getString("subscription_name", null)?.takeIf { it.isNotBlank() } ?: defaultName
+            val subscription = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(12), dp(12), dp(10))
+                background = rounded(0xFF172319.toInt(), 19, 0xFF344A30.toInt())
             }
-            val profileText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            profileText.addView(TextView(this).apply { text = "ПОДПИСКА"; textSize = 9f; setTextColor(0xFFB7FF3C.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD })
-            profileText.addView(TextView(this).apply { text = host; textSize = 13f; setTextColor(0xFFF4F7F2.toInt()); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
-            profileText.addView(TextView(this).apply { text = outboundsCountLabel(); textSize = 11f; setTextColor(0xFF89958C.toInt()) })
-            profile.addView(profileText, LinearLayout.LayoutParams(0, -2, 1f))
+            val top = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val collapse = Button(this).apply {
+                text = if (serversHidden) "›" else "⌄"
+                textSize = 20f
+                isAllCaps = false
+                setTextColor(0xFFB7FF3C.toInt())
+                background = rounded(0xFF22321F.toInt(), 12, 0xFF3A5232.toInt())
+                stateListAnimator = null
+                contentDescription = if (serversHidden) "Показать серверы" else "Скрыть серверы"
+                setOnClickListener {
+                    serversHidden = !serversHidden
+                    serverListScroll.visibility = if (serversHidden) View.GONE else View.VISIBLE
+                    text = if (serversHidden) "›" else "⌄"
+                    contentDescription = if (serversHidden) "Показать серверы" else "Скрыть серверы"
+                }
+            }
+            top.addView(collapse, LinearLayout.LayoutParams(dp(38), dp(42)))
+            val profileText = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(10), 0, dp(6), 0)
+            }
+            profileText.addView(TextView(this).apply {
+                text = displayName
+                textSize = 15f
+                setTextColor(0xFFF1F6ED.toInt())
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            profileText.addView(TextView(this).apply {
+                text = if (isUrl) defaultName else "Локальный список серверов"
+                textSize = 10f
+                setTextColor(0xFF91A18E.toInt())
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setPadding(0, dp(4), 0, 0)
+            })
+            top.addView(profileText, LinearLayout.LayoutParams(0, -2, 1f))
+
+            fun toolButton(symbol: String, description: String, action: () -> Unit): Button {
+                return Button(this).apply {
+                    text = symbol
+                    textSize = 18f
+                    isAllCaps = false
+                    setTextColor(0xFFB7FF3C.toInt())
+                    background = rounded(0xFF22321F.toInt(), 11)
+                    stateListAnimator = null
+                    contentDescription = description
+                    setOnClickListener { action() }
+                }
+            }
             if (isUrl) {
-                profile.addView(Button(this).apply {
-                    text = "↻"; textSize = 20f; isAllCaps = false; setTextColor(0xFFB7FF3C.toInt())
-                    background = rounded(0xFF1B2A1D.toInt(), 12); stateListAnimator = null
-                    contentDescription = "Обновить подписку"
-                    setOnClickListener { importText(source) }
-                }, LinearLayout.LayoutParams(dp(48), dp(44)))
+                top.addView(toolButton("⟳", "Обновить подписку") { importText(source) },
+                    LinearLayout.LayoutParams(dp(40), dp(40)).apply { leftMargin = dp(4) })
             }
-            pageContent.addView(profile, params(0, 0, 0, 10))
+            top.addView(toolButton("◷", "Проверить пинг") { testServer() },
+                LinearLayout.LayoutParams(dp(40), dp(40)).apply { leftMargin = dp(4) })
+            top.addView(toolButton("•••", "Дополнительные действия") {
+                AlertDialog.Builder(this)
+                    .setItems(arrayOf("Изменить название", "Удалить подписку")) { _, which ->
+                        if (which == 0) {
+                            val input = EditText(this).apply {
+                                setSingleLine(true)
+                                setText(displayName)
+                                hint = "Название подписки"
+                            }
+                            AlertDialog.Builder(this)
+                                .setTitle("Изменить название")
+                                .setView(input)
+                                .setNegativeButton("Отмена", null)
+                                .setPositiveButton("Сохранить") { _, _ ->
+                                    val newName = input.text.toString().trim()
+                                    if (newName.isNotBlank()) {
+                                        prefs.edit().putString("subscription_name", newName).apply()
+                                        showPage("servers")
+                                    }
+                                }
+                                .show()
+                        } else {
+                            if (prefs.getBoolean("connected", false)) {
+                                status.text = "Сначала отключи VPN"
+                                return@setItems
+                            }
+                            AlertDialog.Builder(this)
+                                .setTitle("Удалить подписку?")
+                                .setMessage("Подписка и все серверы внутри неё будут удалены.")
+                                .setNegativeButton("Отмена", null)
+                                .setPositiveButton("Удалить") { _, _ ->
+                                    prefs.edit()
+                                        .remove("profile_source")
+                                        .remove("subscription_name")
+                                        .putString("imported_outbounds_json", "[]")
+                                        .remove(CosmoVpnService.KEY_CONFIG)
+                                        .remove("selected_server_tag")
+                                        .remove("selected_server_name")
+                                        .putInt("server_count", 0)
+                                        .apply()
+                                    serversHidden = false
+                                    showPage("servers")
+                                }
+                                .show()
+                        }
+                    }
+                    .show()
+            }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { leftMargin = dp(4) })
+            top.getChildAt(top.childCount - 1).apply {
+                // Keep the compact tool buttons aligned with the subscription title.
+            }
+            subscription.addView(top)
+
+            val bottom = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(3), dp(12), dp(2), 0)
+            }
+            bottom.addView(TextView(this).apply {
+                text = "ⓘ"
+                textSize = 13f
+                setTextColor(0xFFB7FF3C.toInt())
+            })
+            bottom.addView(TextView(this).apply {
+                text = "  " + outboundsCountLabel()
+                textSize = 10f
+                setTextColor(0xFFB7FF3C.toInt())
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            bottom.addView(TextView(this).apply {
+                text = if (isUrl) "Подписка · автообновление позже" else "Локально · без срока"
+                textSize = 9f
+                setTextColor(0xFF91A18E.toInt())
+            })
+            subscription.addView(bottom)
+            pageContent.addView(subscription, params(0, 0, 0, 12))
         }
 
         importMessage = TextView(this).apply {
@@ -266,7 +405,8 @@ class MainActivity : Activity() {
         pageContent.addView(importMessage, params(0, 0, 0, 4))
 
         val outbounds = runCatching { JSONArray(prefs.getString("imported_outbounds_json", "[]")) }.getOrDefault(JSONArray())
-        val scroll = ScrollView(this)
+        serverListScroll = ScrollView(this)
+        val scroll = serverListScroll
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         if (outbounds.length() == 0) {
             list.addView(TextView(this).apply { text = "Серверов пока нет"; textSize = 14f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); setPadding(0, dp(24), 0, 0) }, LinearLayout.LayoutParams(-1, -2))
@@ -333,6 +473,7 @@ class MainActivity : Activity() {
             }
         }
         scroll.addView(list)
+        scroll.visibility = if (serversHidden) View.GONE else View.VISIBLE
         pageContent.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         pageContent.addView(Button(this).apply {
             text = "＋\nВСТАВИТЬ ИЗ БУФЕРА"; textSize = 14f; isAllCaps = false; gravity = android.view.Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD
