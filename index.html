@@ -18,6 +18,21 @@
 .nav{position:fixed;bottom:0;left:0;right:0;height:69px;background:#0b100def;backdrop-filter:blur(16px);border-top:1px solid #253126;display:flex;justify-content:center;gap:8px;padding:9px 15px calc(9px + env(safe-area-inset-bottom));z-index:3}.nav button{width:min(31%,140px);border:0;background:transparent;color:#718071;border-radius:12px;font-size:10px;font-weight:850;cursor:pointer}.nav button span{display:block;font-size:19px;margin-bottom:3px}.nav button.active{color:var(--green);background:#182318}.toast{position:fixed;bottom:157px;left:50%;transform:translate(-50%,10px);opacity:0;background:#1a281a;border:1px solid #49633a;color:var(--green);padding:11px 16px;border-radius:12px;font-size:11px;z-index:8;transition:.2s;max-width:90%;text-align:center}.toast.show{opacity:1;transform:translate(-50%,0)}
 .modal{position:fixed;inset:0;background:#000b;display:none;align-items:flex-end;justify-content:center;padding:12px;z-index:6}.modal.open{display:flex}.modal-box{width:100%;max-width:440px;background:#111a13;border:1px solid #3a5035;border-radius:22px;padding:18px}.modal-head{display:flex;justify-content:space-between;align-items:center;font-size:17px;font-weight:900}.close{border:0;background:#203020;color:white;border-radius:10px;width:34px;height:34px;font-size:20px}.modal-note{font-size:11px;color:var(--muted);line-height:1.5;margin:10px 0}.modal textarea{width:100%;min-height:100px;background:#080e09;border:1px solid #344534;border-radius:12px;padding:12px;color:var(--white);font:11px/1.5 ui-monospace,monospace;resize:vertical}.modal-action{width:100%;border:0;border-radius:12px;background:var(--green);color:#10170b;padding:14px;font-size:11px;font-weight:950;margin-top:10px}
 @media(min-width:600px){.app{padding-top:34px}.import-btn{bottom:86px}.nav{height:72px}}
+/* UI polish: clean power control, animated chevron and speedometer */
+.power-area{padding:20px 0 32px}
+.power-ring{width:220px;height:220px;background:radial-gradient(circle,#1b2a18 0%,#111a12 57%,#0b100c 70%);box-shadow:0 0 0 7px #101811,0 0 0 8px #2b3d28,0 14px 48px #0008,0 0 42px #a9f83a12}
+.power-ring.on{box-shadow:0 0 0 7px #152314,0 0 0 8px #6a9a36,0 14px 48px #0008,0 0 62px #b7ff3c38}
+.power{width:166px;height:166px;border:1px solid #64834b;background:linear-gradient(145deg,#263b20 0%,#142016 100%);color:var(--green);font-size:0;box-shadow:inset 0 1px 0 #ffffff12,inset 0 0 34px #b7ff3c0d,0 8px 24px #0006}
+.power small{font-size:12px;letter-spacing:1.8px;font-weight:950;margin:0}
+.power.on{background:linear-gradient(145deg,#c8ff66,#91d83a);color:#10170b;border-color:#d4ff8a;box-shadow:0 0 28px #b7ff3c30,inset 0 1px 0 #ffffff66}
+.subscription-symbol{position:relative;transform:none!important}
+.subscription-chevron{width:10px;height:10px;border-right:2px solid var(--green);border-bottom:2px solid var(--green);transform:translateY(-2px) rotate(45deg);transition:transform .24s cubic-bezier(.2,.8,.2,1)}
+.subscription-symbol.collapsed .subscription-chevron{transform:translateY(2px) rotate(-135deg)}
+.subscription-symbol:active .subscription-chevron{transform:translateY(1px) rotate(45deg) scale(.88)}
+.subscription-symbol.collapsed:active .subscription-chevron{transform:translateY(2px) rotate(-135deg) scale(.88)}
+.subscription-tool svg{display:block}
+#subscriptionStats{color:#b7d49d}
+#subscriptionStats:hover{color:var(--green)}
 </style></head>
 <body>
 <main class="app">
@@ -33,11 +48,11 @@
 <div class="section-head"><div><div class="eyebrow">ТВОИ ПОДКЛЮЧЕНИЯ</div><h1>Серверы</h1></div><div class="count" id="serverCount">0 серверов</div></div>
 <section class="subscription-card" aria-label="Информация о подписке">
 <div class="subscription-top">
-<button class="subscription-symbol" id="subscriptionCollapse" aria-label="Скрыть серверы" aria-expanded="true" title="Скрыть или показать серверы">⌄</button>
+<button class="subscription-symbol" id="subscriptionCollapse" aria-label="Скрыть серверы" aria-expanded="true" title="Скрыть или показать серверы"><span class="subscription-chevron"></span></button>
 <div class="subscription-heading"><div class="subscription-name" id="subscriptionName">Моя подписка</div><div class="subscription-caption" id="serverHint">Локальный список серверов</div></div>
 <div class="subscription-tools">
 <button class="subscription-tool" id="subscriptionRefresh" aria-label="Обновить список" title="Обновить">⟳</button>
-<button class="subscription-tool" id="subscriptionStats" aria-label="Проверить пинг" title="Проверить пинг">◷</button>
+<button class="subscription-tool" id="subscriptionStats" aria-label="Проверить пинг" title="Проверить пинг"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 17.5a9 9 0 1 1 15 0"/><path d="M12 13l5-5"/><circle cx="12" cy="13" r="1.3" fill="currentColor" stroke="none"/><path d="M5 18h14"/></svg></button>
 <button class="subscription-tool" id="subscriptionMore" aria-label="Ещё" title="Ещё">•••</button>
 <div class="subscription-menu" id="subscriptionMenu"><button id="subscriptionSettings"><span>✎</span> Изменить название</button><button class="danger" id="subscriptionDelete"><span>⌫</span> Удалить подписку</button></div>
 </div>
