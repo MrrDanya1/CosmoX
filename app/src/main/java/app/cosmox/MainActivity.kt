@@ -14,6 +14,7 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -65,6 +66,8 @@ class MainActivity : Activity() {
 
     private lateinit var pageContent: LinearLayout
     private var currentPage = "home"
+    private var serversHidden = false
+    private lateinit var serverListScroll: ScrollView
 
     private fun buildUi() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(16), dp(20), dp(12)); setBackgroundColor(0xFF050706.toInt()) }
@@ -115,28 +118,110 @@ class MainActivity : Activity() {
     }
 
     private fun renderHomePage() {
-        pageContent.gravity = android.view.Gravity.CENTER
-        pageContent.addView(TextView(this).apply { text = "ЗАЩИТИ СВОЁ СОЕДИНЕНИЕ"; textSize = 10f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 0, 0, 18))
+        pageContent.gravity = android.view.Gravity.TOP
+        pageContent.addView(label("ПАНЕЛЬ УПРАВЛЕНИЯ", 0xFFB7FF3C.toInt(), 10f, 0).apply {
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.12f
+        }, params(0, 8, 0, 5))
+        pageContent.addView(TextView(this).apply {
+            text = "Защищённое соединение"
+            textSize = 26f
+            setTextColor(0xFFF4F7F2.toInt())
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+            letterSpacing = -0.025f
+        }, params(0, 0, 0, 4))
+        pageContent.addView(TextView(this).apply {
+            text = "Твой интернет. Твои правила."
+            textSize = 12f
+            setTextColor(0xFF89958C.toInt())
+        }, params(0, 0, 0, 6))
+
+        status = TextView(this).apply {
+            textSize = 11f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(0xFF89958C.toInt())
+            setPadding(dp(13), dp(8), dp(13), dp(8))
+            background = rounded(0xFF111812.toInt(), 100, 0xFF29392B.toInt())
+        }
+        pageContent.addView(status, params(0, 2, 0, 8))
+
+        val powerArea = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, dp(226))
+            setPadding(0, dp(7), 0, dp(13))
+        }
+        val ring = android.view.View(this).apply {
+            background = oval(0xFF101811.toInt(), 0xFF33472B.toInt())
+            elevation = dp(3).toFloat()
+        }
+        powerArea.addView(ring, FrameLayout.LayoutParams(dp(206), dp(206), android.view.Gravity.CENTER))
         connectButton = Button(this).apply {
-            textSize = 17f; isAllCaps = false; gravity = android.view.Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD; stateListAnimator = null
+            textSize = 15f
+            isAllCaps = false
+            gravity = android.view.Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            stateListAnimator = null
             setOnClickListener {
                 if (prefs.getBoolean("connected", false)) {
                     startService(Intent(this@MainActivity, CosmoVpnService::class.java).setAction(CosmoVpnService.ACTION_STOP))
                     status.text = "Отключаем VPN..."
                 } else {
-                    if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) { status.text = "Сначала добавь сервер"; return@setOnClickListener }
+                    if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) {
+                        status.text = "Сначала добавь сервер"
+                        return@setOnClickListener
+                    }
                     val prepare = VpnService.prepare(this@MainActivity)
                     if (prepare != null) startActivityForResult(prepare, permissionRequest) else startVpn()
                 }
             }
         }
-        pageContent.addView(connectButton, LinearLayout.LayoutParams(dp(216), dp(216)).apply { gravity = android.view.Gravity.CENTER; bottomMargin = dp(18) })
-        status = TextView(this).apply { textSize = 14f; gravity = android.view.Gravity.CENTER; setTextColor(0xFF89958C.toInt()); setPadding(dp(12), dp(8), dp(12), dp(8)); background = rounded(0xFF171E19.toInt(), 100) }
-        pageContent.addView(status, params(0, 0, 0, 18))
-        val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER; setPadding(dp(18), dp(14), dp(18), dp(14)); background = rounded(0xFF101512.toInt(), 18, 0xFF29332B.toInt()); isClickable = true; isFocusable = true; setOnClickListener { showPage("servers") } }
-        card.addView(TextView(this).apply { text = "ВЫБРАННЫЙ СЕРВЕР"; textSize = 9f; setTextColor(0xFF89958C.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD })
-        servers = TextView(this).apply { textSize = 16f; gravity = android.view.Gravity.CENTER; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dp(5), 0, 0); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
-        card.addView(servers)
+        powerArea.addView(connectButton, FrameLayout.LayoutParams(dp(154), dp(154), android.view.Gravity.CENTER))
+        pageContent.addView(powerArea)
+
+        pageContent.addView(label("ТЕКУЩИЙ СЕРВЕР", 0xFFB7FF3C.toInt(), 10f, 0).apply {
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.12f
+        }, params(0, 0, 0, 8))
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+            background = rounded(0xFF172319.toInt(), 17, 0xFF29392B.toInt())
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showPage("servers") }
+        }
+        val flag = TextView(this).apply {
+            text = "✦"
+            textSize = 22f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(0xFFB7FF3C.toInt())
+            background = rounded(0xFF263824.toInt(), 13)
+        }
+        card.addView(flag, LinearLayout.LayoutParams(dp(42), dp(42)))
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+        }
+        info.addView(TextView(this).apply {
+            text = prefs.getString("selected_server_name", null) ?: "Сервер не выбран"
+            textSize = 13f
+            setTextColor(0xFFF1F6ED.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        info.addView(TextView(this).apply {
+            text = if (prefs.getString(CosmoVpnService.KEY_CONFIG, null).isNullOrBlank()) "Перейди во вкладку «Серверы»" else "Xray Core · выбранный сервер"
+            textSize = 10f
+            setTextColor(0xFF899689.toInt())
+            setPadding(0, dp(4), 0, 0)
+        })
+        card.addView(info, LinearLayout.LayoutParams(0, -2, 1f))
+        card.addView(TextView(this).apply {
+            text = "›"
+            textSize = 24f
+            setTextColor(0xFFB7FF3C.toInt())
+        })
         pageContent.addView(card, LinearLayout.LayoutParams(-1, -2))
         updateSavedState()
     }
@@ -274,7 +359,15 @@ class MainActivity : Activity() {
         val neon = 0xFFB7FF3C.toInt()
         connectButton.text = if (connected) "⏻\nОТКЛЮЧИТЬ" else "⏻\nВКЛЮЧИТЬ"
         connectButton.setTextColor(if (connected) 0xFF050706.toInt() else neon)
-        connectButton.background = if (connected) rounded(neon, 1000) else rounded(panel, 1000, neon)
+        connectButton.background = if (connected) oval(neon) else oval(panel, neon)
+    }
+
+    private fun oval(color: Int, stroke: Int? = null): android.graphics.drawable.GradientDrawable {
+        return android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(color)
+            if (stroke != null) setStroke(dp(1), stroke)
+        }
     }
 
     private fun rounded(color: Int, radius: Int, stroke: Int? = null): android.graphics.drawable.GradientDrawable {
