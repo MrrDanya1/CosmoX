@@ -68,12 +68,23 @@ class MainActivity : Activity() {
     private var currentPage = "home"
     private var serversHidden = false
     private lateinit var serverListScroll: ScrollView
+    private lateinit var navHome: LinearLayout
+    private lateinit var navServers: LinearLayout
+    private lateinit var navSettings: LinearLayout
 
     private fun buildUi() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(16), dp(20), dp(12)); setBackgroundColor(0xFF050706.toInt()) }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        brand.addView(TextView(this).apply { text = "CosmoX"; textSize = 31f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD })
+        brand.addView(TextView(this).apply {
+            val logo = android.text.SpannableString("CosmoX")
+            logo.setSpan(android.text.style.ForegroundColorSpan(0xFFB7FF3C.toInt()), 5, 6, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            text = logo
+            textSize = 27f
+            setTextColor(0xFFF4F7F2.toInt())
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+            letterSpacing = -0.04f
+        })
         brand.addView(label("PRIVATE NETWORK", 0xFF89958C.toInt(), 10f, 0))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(TextView(this).apply { text = "● XRAY"; textSize = 11f; setTextColor(0xFFB7FF3C.toInt()); setPadding(dp(12), dp(8), dp(12), dp(8)); background = rounded(0xFF171E19.toInt(), 100, 0xFF283629.toInt()) })
@@ -81,23 +92,78 @@ class MainActivity : Activity() {
         pageContent = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER }
         root.addView(pageContent, LinearLayout.LayoutParams(-1, 0, 1f))
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER; setPadding(dp(6), dp(7), dp(6), dp(7)); background = rounded(0xFF101512.toInt(), 22, 0xFF202821.toInt()) }
-        nav.addView(navButton("⌂", "Главная", 0xFFF4F7F2.toInt(), 0xFF171E19.toInt()) { showPage("home") }, LinearLayout.LayoutParams(0, dp(58), 1f))
-        nav.addView(navButton("▦", "Серверы", 0xFFB7FF3C.toInt(), 0xFF101512.toInt()) { showPage("servers") }, LinearLayout.LayoutParams(0, dp(58), 1f).apply { leftMargin = dp(5); rightMargin = dp(5) })
-        nav.addView(navButton("⚙", "Настройки", 0xFF89958C.toInt(), 0xFF101512.toInt()) { showPage("settings") }, LinearLayout.LayoutParams(0, dp(58), 1f))
+        navHome = navButton("⌂", "ГЛАВНАЯ", 0xFFB7FF3C.toInt(), 0xFF171E19.toInt()) { showPage("home") }
+        navServers = navButton("▤", "СЕРВЕРЫ", 0xFF89958C.toInt(), 0xFF101512.toInt()) { showPage("servers") }
+        navSettings = navButton("⚙", "НАСТРОЙКИ", 0xFF89958C.toInt(), 0xFF101512.toInt()) { showPage("settings") }
+        nav.addView(navHome, LinearLayout.LayoutParams(0, dp(58), 1f))
+        nav.addView(navServers, LinearLayout.LayoutParams(0, dp(58), 1f).apply { leftMargin = dp(5); rightMargin = dp(5) })
+        nav.addView(navSettings, LinearLayout.LayoutParams(0, dp(58), 1f))
+        updateNavigation("home")
         root.addView(nav, params(0, 12, 0, 0))
         setContentView(root)
         showPage("home")
     }
 
+    private fun updateNavigation(page: String) {
+        if (!::navHome.isInitialized) return
+        fun style(item: LinearLayout, active: Boolean) {
+            val color = if (active) 0xFFB7FF3C.toInt() else 0xFF89958C.toInt()
+            item.background = rounded(if (active) 0xFF1B281B.toInt() else 0xFF101512.toInt(), 16)
+            for (i in 0 until item.childCount) {
+                (item.getChildAt(i) as? TextView)?.setTextColor(color)
+            }
+        }
+        style(navHome, page == "home")
+        style(navServers, page == "servers")
+        style(navSettings, page == "settings")
+    }
+
     private fun showPage(page: String) {
         currentPage = page
+        updateNavigation(page)
         pageContent.removeAllViews()
         when (page) {
             "servers" -> renderServersPage()
             "settings" -> {
                 pageContent.gravity = android.view.Gravity.TOP
-                pageContent.addView(TextView(this).apply { text = "НАСТРОЙКИ"; textSize = 24f; setTextColor(0xFFF4F7F2.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 8, 0, 12))
-                pageContent.addView(TextView(this).apply { text = "Раздел настроек добавим позже"; textSize = 14f; setTextColor(0xFF89958C.toInt()) })
+                pageContent.addView(label("ПЕРСОНАЛИЗАЦИЯ", 0xFFB7FF3C.toInt(), 10f, 0).apply { typeface = android.graphics.Typeface.DEFAULT_BOLD }, params(0, 8, 0, 5))
+                pageContent.addView(TextView(this).apply {
+                    text = "Настройки"
+                    textSize = 26f
+                    setTextColor(0xFFF1F6ED.toInt())
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }, params(0, 0, 0, 4))
+                pageContent.addView(TextView(this).apply {
+                    text = "Управление приложением CosmoX"
+                    textSize = 12f
+                    setTextColor(0xFF899689.toInt())
+                }, params(0, 0, 0, 18))
+                val items = listOf(
+                    "Автоподключение" to "Подключаться при запуске  ·  ВЫКЛ",
+                    "Тема оформления" to "Чёрная · Neon Green  ·  АКТИВНА",
+                    "Ядро" to "Xray Core",
+                    "О приложении" to "CosmoX"
+                )
+                items.forEach { item ->
+                    val setting = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(15), dp(14), dp(15), dp(14))
+                        background = rounded(0xFF111812.toInt(), 15, 0xFF29392B.toInt())
+                    }
+                    setting.addView(TextView(this).apply {
+                        text = item.first
+                        textSize = 14f
+                        setTextColor(0xFFF1F6ED.toInt())
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    })
+                    setting.addView(TextView(this).apply {
+                        text = item.second
+                        textSize = 10f
+                        setTextColor(0xFF899689.toInt())
+                        setPadding(0, dp(5), 0, 0)
+                    })
+                    pageContent.addView(setting, params(0, 0, 0, 9))
+                }
             }
             else -> renderHomePage()
         }
