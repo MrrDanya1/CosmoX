@@ -767,9 +767,73 @@ class MainActivity : Activity() {
         return emptyList()
     }
 
+    /**
+     * Подписка servers-bot отдаёт массив полноценных Xray JSON-профилей,
+     * а не share-ссылки. Собираем proxy outbounds из профилей по исходному
+     * порядку; служебные direct/block/dns outbounds не показываем как серверы.
+     */
+    private fun convertXrayJsonSubscription(source: String): Pair<JSONArray, Int>? {
+        val configs = try {
+            if (source.trimStart().startsWith("[")) {
+                val array = JSONArray(source)
+                (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+            } else {
+                listOf(JSONObject(source))
+            }
+        } catch (_: Exception) {
+            return null
+        }
+
+        if (configs.isEmpty() || configs.none { it.has("outbounds") }) return null
+        if (configs.any { it.optJSONArray("outbounds") == null }) {
+            error("В подписке смешаны разные форматы JSON-конфигураций")
+        }
+
+        val combined = JSONArray()
+        val usedTags = mutableSetOf<String>()
+        var skipped = 0
+        val ignoredProtocols = setOf("freedom", "direct", "blackhole", "block", "dns", "")
+
+        for ((configIndex, config) in configs.withIndex()) {
+            val profileName = config.optString("remarks")
+                .ifBlank { config.optString("name") }
+                .ifBlank { "Профиль ${configIndex + 1}" }
+            val outbounds = config.optJSONArray("outbounds") ?: continue
+
+            for (i in 0 until outbounds.length()) {
+                val original = outbounds.optJSONObject(i) ?: continue
+                val protocol = original.optString("protocol").lowercase()
+                if (protocol in ignoredProtocols) {
+                    skipped++
+                    continue
+                }
+
+                val item = JSONObject(original.toString())
+                val baseTag = item.optString("tag")
+                    .ifBlank { "Сервер ${combined.length() + 1}" }
+                val preferredTag = if (configs.size > 1) "$profileName · $baseTag" else baseTag
+                var uniqueTag = preferredTag
+                var suffix = 2
+                while (usedTags.contains(uniqueTag)) {
+                    uniqueTag = "$preferredTag ($suffix)"
+                    suffix++
+                }
+                usedTags.add(uniqueTag)
+                item.put("tag", uniqueTag)
+                combined.put(item)
+            }
+        }
+
+        if (combined.length() == 0) error("В JSON-подписке не найдено поддерживаемых proxy-серверов")
+        return Pair(combined, skipped)
+    }
+
     private fun convertSubscriptionInOrder(text: String): Pair<JSONArray, Int> {
         val source = text.trim().removePrefix("\uFEFF")
         if (source.startsWith("{") || source.startsWith("[")) {
+            val jsonProfiles = convertXrayJsonSubscription(source)
+            if (jsonProfiles != null) return jsonProfiles
+
             val response = XrayBridge.invoke("convertShareLinksToXrayJson", JSONObject().put("text", source))
             val data = response.optJSONObject("data") ?: error("Парсер не вернул список серверов")
             return Pair(data.optJSONArray("outbounds") ?: error("В JSON не найден список серверов"), 0)
